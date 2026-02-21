@@ -1,19 +1,18 @@
 # cosign-public-data-poc
 
 This repository is a public-data underwriting risk proof of concept in Python.
-The current version builds a county-level eviction-risk context feature that will later join to Cosign applicant scoring.
+It includes a monthly county pipeline and a parallel yearly Eviction Lab pipeline for county-level context risk scoring.
 
-## Required input file
+## Required input files
 
-Place a raw CSV at:
+Monthly pipeline input:
+- `data/raw/eviction_county_month.csv`
+- Required columns (case-insensitive): `county_fips`, `month`, `eviction_filing_rate`
 
-`data/raw/eviction_county_month.csv`
-
-Required columns (case-insensitive matching is supported):
-
-- `county_fips`: county identifier (string or int). It will be normalized to a zero-padded 5-character string.
-- `month`: month timestamp (`YYYY-MM-01` or `YYYY-MM`, or another pandas-parseable monthly format).
-- `eviction_filing_rate`: float eviction filing rate for that county-month.
+Yearly Eviction Lab pipeline input:
+- `data/raw/county_proprietary_valid_2000_2018.csv`
+- Expected columns include: `cofips`, `county`, `state`, `year`, `filings`, `filing_rate`
+- The yearly pipeline uses observed/validated annual rates and treats the data as an irregular panel (no gap-filling for missing years).
 
 ## Setup
 
@@ -23,19 +22,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## How to run
+## Monthly pipeline tasks
 
-Train model and write artifacts:
+Train monthly model and write artifacts:
 
 ```bash
 python -m src.main --task train_eviction_model
 ```
-
-Outputs:
-
-- `data/processed/eviction_features.csv`
-- `models/eviction_risk_model.joblib`
-- `reports/model_metrics.json`
 
 Score all counties for latest month:
 
@@ -43,16 +36,40 @@ Score all counties for latest month:
 python -m src.main --task score_latest
 ```
 
-Output:
-
-- `reports/county_risk_scores_latest.csv`
-
-Score one county (example FIPS `39049`):
+Score one county for latest month:
 
 ```bash
 python -m src.main --task score_county --fips 39049
 ```
 
+## Yearly Eviction Lab tasks
+
+Train yearly model and write artifacts:
+
+```bash
+python -m src.main --task train_eviction_lab_yearly
+```
+
+Outputs:
+- `data/processed/eviction_lab_yearly_features.csv`
+- `models/eviction_lab_yearly_model.joblib`
+- `reports/eviction_lab_yearly_model_metrics.json`
+
+Score all counties for latest available year:
+
+```bash
+python -m src.main --task score_eviction_lab_latest_year
+```
+
+Output:
+- `reports/eviction_lab_county_risk_scores_latest_year.csv`
+
+Score one county for latest available year:
+
+```bash
+python -m src.main --task score_eviction_lab_county --fips 39049
+```
+
 ## Next steps
 
-Next, we will add broader public-data ingestion and a stronger baseline model, then join this county risk signal into applicant-level underwriting workflows.
+Next, we will join these county-level context scores to applicant-level Cosign underwriting features and expand the modeling baseline.

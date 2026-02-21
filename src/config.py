@@ -14,3 +14,15 @@ FEATURE_TABLE_PATH: Path = PROCESSED_DIR / "eviction_features.csv"
 MODEL_PATH: Path = MODELS_DIR / "eviction_risk_model.joblib"
 METRICS_PATH: Path = REPORTS_DIR / "model_metrics.json"
 LATEST_SCORES_PATH: Path = REPORTS_DIR / "county_risk_scores_latest.csv"
+
+RAW_EVICTION_LAB_YEARLY_PATH: Path = RAW_DIR / "county_proprietary_valid_2000_2018.csv"
+EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH: Path = (
+    PROCESSED_DIR / "eviction_lab_yearly_features.csv"
+)
+EVICTION_LAB_YEARLY_MODEL_PATH: Path = MODELS_DIR / "eviction_lab_yearly_model.joblib"
+EVICTION_LAB_YEARLY_METRICS_PATH: Path = (
+    REPORTS_DIR / "eviction_lab_yearly_model_metrics.json"
+)
+EVICTION_LAB_YEARLY_LATEST_SCORES_PATH: Path = (
+    REPORTS_DIR / "eviction_lab_county_risk_scores_latest_year.csv"
+)
