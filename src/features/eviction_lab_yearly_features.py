@@ -6,6 +6,7 @@ import pandas as pd
 OUTPUT_COLUMNS = [
     "county_fips",
     "year",
+    "outcome_year",
     "y",
     "lag_1",
     "lag_3_mean_obs",
@@ -70,23 +71,27 @@ def build_eviction_lab_yearly_features(df: pd.DataFrame) -> pd.DataFrame:
     label_df = _build_next_year_label(base_df)
 
     modeling_df = feature_df.merge(label_df, on=["county_fips", "year"], how="left")
+    modeling_df["outcome_year"] = modeling_df["year"] + 1
 
-    # Keep rows only when the county has an observed row at year t+1.
-    county_year_pairs = base_df[["county_fips", "year"]].copy()
-    county_year_pairs["year"] = county_year_pairs["year"] - 1
-    county_year_pairs["has_next_year_obs"] = 1
+    # Mark whether this county has an observed row at the target outcome year.
+    outcome_observation_df = base_df[["county_fips", "year"]].copy()
+    outcome_observation_df = outcome_observation_df.rename(
+        columns={"year": "outcome_year"}
+    )
+    outcome_observation_df["has_outcome_observation"] = 1
 
     modeling_df = modeling_df.merge(
-        county_year_pairs,
-        on=["county_fips", "year"],
+        outcome_observation_df,
+        on=["county_fips", "outcome_year"],
         how="left",
     )
 
-    modeling_df = modeling_df[modeling_df["has_next_year_obs"] == 1].copy()
+    # Keep y only when the county has an actual next-year observation.
+    modeling_df.loc[modeling_df["has_outcome_observation"] != 1, "y"] = pd.NA
     modeling_df = modeling_df.dropna(
-        subset=["y", "lag_1", "lag_3_mean_obs", "lag_5_mean_obs"]
+        subset=["lag_1", "lag_3_mean_obs", "lag_5_mean_obs"]
     ).copy()
-    modeling_df["y"] = modeling_df["y"].astype(int)
+    modeling_df["y"] = modeling_df["y"].astype("Int64")
 
     modeling_df = modeling_df[OUTPUT_COLUMNS].sort_values(["county_fips", "year"])
     return modeling_df.reset_index(drop=True)

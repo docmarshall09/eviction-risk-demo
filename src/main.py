@@ -6,10 +6,14 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 
 from src.config import (
+    EVICTION_LAB_BACKTEST_LAST_TWO_YEARS_PATH,
+    EVICTION_LAB_BACKTEST_LAST_YEAR_PATH,
+    EVICTION_LAB_HOLDOUT_DETAIL_LAST_TWO_YEARS_PATH,
+    EVICTION_LAB_HOLDOUT_DETAIL_LAST_YEAR_PATH,
     EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH,
     EVICTION_LAB_YEARLY_LATEST_SCORES_PATH,
     EVICTION_LAB_YEARLY_METRICS_PATH,
@@ -32,11 +36,15 @@ from src.datasets.eviction_lab_yearly import (
 from src.features.eviction_features import build_feature_frame
 from src.features.eviction_lab_yearly_features import build_eviction_lab_yearly_features
 from src.models.eviction_lab_yearly_model import (
+    MODEL_FEATURE_COLUMNS,
+    build_holdout_detail,
+    evaluate_at_top_quartile,
     evaluate_eviction_lab_yearly_model,
     load_eviction_lab_yearly_model,
     save_eviction_lab_yearly_model,
     score_counties_yearly,
     score_latest_year,
+    split_by_outcome_year,
     split_train_test_by_year,
     train_eviction_lab_yearly_model,
 )
@@ -58,6 +66,8 @@ VALID_TASKS = [
     "train_eviction_lab_yearly",
     "score_eviction_lab_latest_year",
     "score_eviction_lab_county",
+    "backtest_eviction_lab_yearly",
+    "train_eviction_lab_yearly_final",
 ]
 
 
@@ -102,11 +112,43 @@ def _standardize_yearly_feature_df(feature_df: pd.DataFrame) -> pd.DataFrame:
     )
     standardized_df["year"] = pd.to_numeric(standardized_df["year"], errors="coerce")
     standardized_df["year"] = standardized_df["year"].astype(int)
+    standardized_df["outcome_year"] = pd.to_numeric(
+        standardized_df["outcome_year"], errors="coerce"
+    )
+    standardized_df["outcome_year"] = standardized_df["outcome_year"].astype(int)
+
     standardized_df["sample_weight"] = pd.to_numeric(
         standardized_df["sample_weight"],
         errors="coerce",
     ).fillna(1.0)
+
+    standardized_df["y"] = pd.to_numeric(
+        standardized_df["y"],
+        errors="coerce",
+    ).astype("Int64")
     return standardized_df
+
+
+def _get_labeled_yearly_rows(feature_df: pd.DataFrame) -> pd.DataFrame:
+    """Return rows that are fully labeled and model-ready for yearly training."""
+    required_columns = MODEL_FEATURE_COLUMNS + ["y", "sample_weight", "outcome_year"]
+    labeled_df = feature_df.dropna(subset=required_columns).copy()
+    labeled_df["y"] = labeled_df["y"].astype(int)
+    return labeled_df
+
+
+def _load_and_clean_raw_data() -> pd.DataFrame:
+    """Load monthly raw CSV and return a validated clean dataframe."""
+    raw_df = load_raw_eviction_data(str(RAW_EVICTION_PATH))
+    clean_df = validate_and_clean_eviction_df(raw_df)
+    return clean_df
+
+
+def _load_and_clean_eviction_lab_yearly_data() -> pd.DataFrame:
+    """Load yearly raw CSV and return a validated clean dataframe."""
+    raw_df = load_eviction_lab_yearly(str(RAW_EVICTION_LAB_YEARLY_PATH))
+    clean_df = clean_eviction_lab_yearly(raw_df)
+    return clean_df
 
 
 def _load_or_build_feature_table() -> pd.DataFrame:
@@ -129,7 +171,13 @@ def _load_or_build_yearly_feature_table() -> pd.DataFrame:
     """Load yearly feature table if available, else rebuild from raw data."""
     if EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH.exists():
         feature_df = pd.read_csv(EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH)
-        return _standardize_yearly_feature_df(feature_df)
+        if "outcome_year" in feature_df.columns:
+            return _standardize_yearly_feature_df(feature_df)
+
+        LOGGER.info(
+            "Yearly feature table at %s is outdated. Rebuilding with outcome_year.",
+            EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH,
+        )
 
     LOGGER.info(
         "Yearly feature table not found at %s. Rebuilding from raw data.",
@@ -141,18 +189,10 @@ def _load_or_build_yearly_feature_table() -> pd.DataFrame:
     return _standardize_yearly_feature_df(feature_df)
 
 
-def _load_and_clean_raw_data() -> pd.DataFrame:
-    """Load monthly raw CSV and return a validated clean dataframe."""
-    raw_df = load_raw_eviction_data(str(RAW_EVICTION_PATH))
-    clean_df = validate_and_clean_eviction_df(raw_df)
-    return clean_df
-
-
-def _load_and_clean_eviction_lab_yearly_data() -> pd.DataFrame:
-    """Load yearly raw CSV and return a validated clean dataframe."""
-    raw_df = load_eviction_lab_yearly(str(RAW_EVICTION_LAB_YEARLY_PATH))
-    clean_df = clean_eviction_lab_yearly(raw_df)
-    return clean_df
+def _write_json_report(report_path: Path, payload: dict) -> None:
+    """Write a JSON payload to a report path with UTF-8 encoding."""
+    with report_path.open("w", encoding="utf-8") as report_file:
+        json.dump(payload, report_file, indent=2)
 
 
 def run_train_eviction_model() -> None:
@@ -173,9 +213,7 @@ def run_train_eviction_model() -> None:
 
     feature_df.to_csv(FEATURE_TABLE_PATH, index=False)
     save_model(model, str(MODEL_PATH))
-
-    with METRICS_PATH.open("w", encoding="utf-8") as metrics_file:
-        json.dump(metrics, metrics_file, indent=2)
+    _write_json_report(METRICS_PATH, metrics)
 
     LOGGER.info("Wrote monthly feature table to %s", FEATURE_TABLE_PATH)
     LOGGER.info("Saved monthly model to %s", MODEL_PATH)
@@ -183,33 +221,97 @@ def run_train_eviction_model() -> None:
 
 
 def run_train_eviction_lab_yearly() -> None:
-    """Train yearly model, evaluate with a year split, and write artifacts."""
+    """Train yearly model with feature-year split and write artifacts."""
     _ensure_output_directories()
 
-    clean_df = _load_and_clean_eviction_lab_yearly_data()
-    feature_df = build_eviction_lab_yearly_features(clean_df)
+    feature_df = _load_or_build_yearly_feature_table()
+    labeled_df = _get_labeled_yearly_rows(feature_df)
 
-    if feature_df.empty:
+    if labeled_df.empty:
         raise ValueError(
-            "Yearly feature table is empty after preprocessing. Check input data coverage."
+            "No labeled yearly rows available after preprocessing. Check input data coverage."
         )
 
-    train_df, test_df = split_train_test_by_year(feature_df)
+    train_df, test_df = split_train_test_by_year(labeled_df)
     model = train_eviction_lab_yearly_model(train_df)
     metrics = evaluate_eviction_lab_yearly_model(model, test_df)
 
-    feature_df.to_csv(EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH, index=False)
     save_eviction_lab_yearly_model(model, str(EVICTION_LAB_YEARLY_MODEL_PATH))
+    _write_json_report(EVICTION_LAB_YEARLY_METRICS_PATH, metrics)
 
-    with EVICTION_LAB_YEARLY_METRICS_PATH.open("w", encoding="utf-8") as metrics_file:
-        json.dump(metrics, metrics_file, indent=2)
-
-    LOGGER.info(
-        "Wrote yearly feature table to %s",
-        EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH,
-    )
     LOGGER.info("Saved yearly model to %s", EVICTION_LAB_YEARLY_MODEL_PATH)
     LOGGER.info("Saved yearly metrics to %s", EVICTION_LAB_YEARLY_METRICS_PATH)
+
+
+def _run_outcome_year_backtest(
+    labeled_feature_df: pd.DataFrame,
+    holdout_outcome_years: list[int],
+    metrics_path: Path,
+    detail_path: Path,
+) -> None:
+    """Train/test one outcome-year holdout configuration and write artifacts."""
+    train_df, test_df = split_by_outcome_year(
+        labeled_feature_df,
+        holdout_outcome_years=holdout_outcome_years,
+    )
+    model = train_eviction_lab_yearly_model(train_df)
+
+    metrics = evaluate_at_top_quartile(model, test_df)
+    detail_df = build_holdout_detail(model, test_df)
+
+    _write_json_report(metrics_path, metrics)
+    detail_df.to_csv(detail_path, index=False)
+
+    LOGGER.info("Wrote backtest metrics to %s", metrics_path)
+    LOGGER.info("Wrote backtest detail to %s", detail_path)
+
+
+def run_backtest_eviction_lab_yearly() -> None:
+    """Run leakage-safe backtests using last 1 and last 2 outcome years."""
+    _ensure_output_directories()
+
+    feature_df = _load_or_build_yearly_feature_table()
+    labeled_df = _get_labeled_yearly_rows(feature_df)
+
+    outcome_years = sorted(labeled_df["outcome_year"].unique().tolist())
+    if not outcome_years:
+        raise ValueError("No labeled yearly rows found for backtesting.")
+
+    last_outcome_year = int(outcome_years[-1])
+    _run_outcome_year_backtest(
+        labeled_feature_df=labeled_df,
+        holdout_outcome_years=[last_outcome_year],
+        metrics_path=EVICTION_LAB_BACKTEST_LAST_YEAR_PATH,
+        detail_path=EVICTION_LAB_HOLDOUT_DETAIL_LAST_YEAR_PATH,
+    )
+
+    if len(outcome_years) < 2:
+        raise ValueError("Need at least two outcome years for last-2-years backtest.")
+
+    last_two_outcome_years = [int(outcome_years[-2]), int(outcome_years[-1])]
+    _run_outcome_year_backtest(
+        labeled_feature_df=labeled_df,
+        holdout_outcome_years=last_two_outcome_years,
+        metrics_path=EVICTION_LAB_BACKTEST_LAST_TWO_YEARS_PATH,
+        detail_path=EVICTION_LAB_HOLDOUT_DETAIL_LAST_TWO_YEARS_PATH,
+    )
+
+
+def run_train_eviction_lab_yearly_final() -> None:
+    """Train yearly model on all labeled rows and overwrite the model artifact."""
+    _ensure_output_directories()
+
+    feature_df = _load_or_build_yearly_feature_table()
+    labeled_df = _get_labeled_yearly_rows(feature_df)
+
+    if labeled_df.empty:
+        raise ValueError("No labeled yearly rows available for final retraining.")
+
+    model = train_eviction_lab_yearly_model(labeled_df)
+    save_eviction_lab_yearly_model(model, str(EVICTION_LAB_YEARLY_MODEL_PATH))
+
+    LOGGER.info("Trained final yearly model on %d labeled rows.", len(labeled_df))
+    LOGGER.info("Saved final yearly model to %s", EVICTION_LAB_YEARLY_MODEL_PATH)
 
 
 def _load_monthly_model_or_raise(model_path: Path) -> Pipeline:
@@ -227,7 +329,8 @@ def _load_yearly_model_or_raise(model_path: Path) -> LogisticRegression:
     if not model_path.exists():
         raise FileNotFoundError(
             "Yearly model file not found at "
-            f"{model_path}. Run '--task train_eviction_lab_yearly' first."
+            f"{model_path}. Run '--task train_eviction_lab_yearly' or "
+            "'--task train_eviction_lab_yearly_final' first."
         )
     return load_eviction_lab_yearly_model(str(model_path))
 
@@ -288,6 +391,9 @@ def run_score_eviction_lab_latest_year() -> None:
     feature_df = _load_or_build_yearly_feature_table()
 
     scores_df = score_latest_year(model, feature_df)
+    if scores_df.empty:
+        raise ValueError("No scoreable rows found in the latest year for yearly pipeline.")
+
     scores_df.to_csv(EVICTION_LAB_YEARLY_LATEST_SCORES_PATH, index=False)
 
     latest_year = int(scores_df["year"].max())
@@ -318,8 +424,13 @@ def run_score_eviction_lab_county(fips: str) -> None:
     latest_county_row = county_df[county_df["year"] == latest_year].copy()
 
     scores_df = score_counties_yearly(model, latest_county_row)
-    risk_score = float(scores_df.iloc[0]["risk_score"])
+    if scores_df.empty:
+        raise ValueError(
+            f"County {normalized_fips} has no scoreable latest-year row. "
+            "This usually means not enough observed history for lag features."
+        )
 
+    risk_score = float(scores_df.iloc[0]["risk_score"])
     print(
         "county_fips="
         f"{normalized_fips}, year={latest_year}, risk_score={risk_score:.6f}"
@@ -377,6 +488,14 @@ def main() -> None:
                     "'--fips' is required when task is score_eviction_lab_county."
                 )
             run_score_eviction_lab_county(args.fips)
+            return
+
+        if args.task == "backtest_eviction_lab_yearly":
+            run_backtest_eviction_lab_yearly()
+            return
+
+        if args.task == "train_eviction_lab_yearly_final":
+            run_train_eviction_lab_yearly_final()
             return
 
     except FileNotFoundError as error:

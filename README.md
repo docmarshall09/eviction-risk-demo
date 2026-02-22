@@ -70,6 +70,38 @@ Score one county for latest available year:
 python -m src.main --task score_eviction_lab_county --fips 39049
 ```
 
+## Backtesting
+
+Run leakage-safe yearly backtests using outcome-year holdouts:
+
+```bash
+python -m src.main --task backtest_eviction_lab_yearly
+```
+
+This command runs two evaluations:
+- Last outcome-year holdout (for example, 2018 when that is the latest year).
+- Last two outcome-years holdout (for example, 2017 and 2018).
+
+Artifacts written:
+- `reports/eviction_lab_yearly_backtest_last_year.json`
+- `reports/eviction_lab_yearly_backtest_last_2_years.json`
+- `reports/eviction_lab_yearly_holdout_detail_last_year.csv`
+- `reports/eviction_lab_yearly_holdout_detail_last_2_years.csv`
+
+## Final retrain
+
+After reviewing backtest quality, retrain the yearly model on all labeled rows:
+
+```bash
+python -m src.main --task train_eviction_lab_yearly_final
+```
+
+Then generate latest-year county scores:
+
+```bash
+python -m src.main --task score_eviction_lab_latest_year
+```
+
 ## Next steps
 
 Next, we will join these county-level context scores to applicant-level Cosign underwriting features and expand the modeling baseline.

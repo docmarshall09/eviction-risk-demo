@@ -26,3 +26,15 @@ EVICTION_LAB_YEARLY_METRICS_PATH: Path = (
 EVICTION_LAB_YEARLY_LATEST_SCORES_PATH: Path = (
     REPORTS_DIR / "eviction_lab_county_risk_scores_latest_year.csv"
 )
+EVICTION_LAB_BACKTEST_LAST_YEAR_PATH: Path = (
+    REPORTS_DIR / "eviction_lab_yearly_backtest_last_year.json"
+)
+EVICTION_LAB_BACKTEST_LAST_TWO_YEARS_PATH: Path = (
+    REPORTS_DIR / "eviction_lab_yearly_backtest_last_2_years.json"
+)
+EVICTION_LAB_HOLDOUT_DETAIL_LAST_YEAR_PATH: Path = (
+    REPORTS_DIR / "eviction_lab_yearly_holdout_detail_last_year.csv"
+)
+EVICTION_LAB_HOLDOUT_DETAIL_LAST_TWO_YEARS_PATH: Path = (
+    REPORTS_DIR / "eviction_lab_yearly_holdout_detail_last_2_years.csv"
+)
