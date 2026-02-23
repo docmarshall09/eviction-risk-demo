@@ -2,6 +2,13 @@
 
 Run these commands from the repo root (`/Users/marshalldeese/Projects/cosign-public-data-poc`).
 
+## Build behavior note
+
+- Docker image builds are slower now because the Dockerfile trains the yearly model during build.
+- Runtime requests are fast because `/score` starts with trained artifacts already in the image.
+- The app does not download data or train models at container startup.
+- The final runtime image excludes the raw Eviction Lab CSV.
+
 ```bash
 export APP=cosign-public-data-poc-demo
 export REGION=iad
@@ -61,4 +68,4 @@ curl -sS -X POST "https://${APP}.fly.dev/score" \
   -d '{"county_fips":"39049"}'
 ```
 
-This deploy flow does not commit or bake proprietary CSV/model artifacts into the image.
+With the current Dockerfile, trained model-serving artifacts are baked into the image at build time, but the raw Eviction Lab CSV is not included in the final runtime image.
