@@ -58,6 +58,28 @@ class ScoreResponse(BaseModel):
     risk_score: float = Field(..., ge=0.0, le=1.0, description="Predicted risk score.")
     model_version: str = Field(..., description="Trained model version identifier.")
     model_type: str = Field(..., description="Model type identifier.")
+    as_of_year_available: Optional[bool] = Field(
+        None,
+        description="Whether requested as_of_year exists for this county in the feature table.",
+    )
+    available_years_min: Optional[int] = Field(
+        None,
+        description="Minimum available feature year for this county, when known.",
+    )
+    available_years_max: Optional[int] = Field(
+        None,
+        description="Maximum available feature year for this county, when known.",
+    )
+    risk_percentile_in_year: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=100.0,
+        description="Percentile rank of risk_score among scoreable counties in that year.",
+    )
+    features_used: Optional[Dict[str, float]] = Field(
+        None,
+        description="Model feature values used for this county-year score.",
+    )
     notes: Optional[str] = Field(None, description="Optional scoring note.")
 
     model_config = ConfigDict(
@@ -68,6 +90,16 @@ class ScoreResponse(BaseModel):
                 "risk_score": 0.7421,
                 "model_version": "20260223T160102Z_ab12cd3",
                 "model_type": "eviction_lab_yearly_logreg",
+                "as_of_year_available": True,
+                "available_years_min": 2004,
+                "available_years_max": 2017,
+                "risk_percentile_in_year": 93.8,
+                "features_used": {
+                    "lag_1": 4.21,
+                    "lag_3_mean_obs": 3.98,
+                    "lag_5_mean_obs": 3.44,
+                    "years_since_last_obs": 1.0,
+                },
                 "notes": None,
             }
         }

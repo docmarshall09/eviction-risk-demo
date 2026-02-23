@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
             payload = service.get_metadata()
             return MetadataResponse(**payload)
         except ScoringServiceError as error:
-            raise HTTPException(status_code=error.status_code, detail=error.message) from error
+            raise HTTPException(status_code=error.status_code, detail=error.to_detail()) from error
 
     @app.post("/score", response_model=ScoreResponse)
     def score(request: ScoreRequest) -> ScoreResponse:
@@ -67,7 +67,7 @@ def create_app() -> FastAPI:
             )
             return ScoreResponse(**payload)
         except ScoringServiceError as error:
-            raise HTTPException(status_code=error.status_code, detail=error.message) from error
+            raise HTTPException(status_code=error.status_code, detail=error.to_detail()) from error
 
     @app.post("/score/batch", response_model=list[ScoreResponse])
     def score_batch(requests: list[ScoreRequest]) -> list[ScoreResponse]:
@@ -83,7 +83,7 @@ def create_app() -> FastAPI:
                 )
                 responses.append(ScoreResponse(**payload))
             except ScoringServiceError as error:
-                raise HTTPException(status_code=error.status_code, detail=error.message) from error
+                raise HTTPException(status_code=error.status_code, detail=error.to_detail()) from error
 
         return responses
 

@@ -26,16 +26,29 @@ DEFAULT_LIMITATIONS = [
 class ScoringServiceError(Exception):
     """Service-layer error carrying an HTTP-friendly status code."""
 
-    def __init__(self, message: str, status_code: int) -> None:
+    def __init__(
+        self,
+        message: str,
+        status_code: int,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Initialize the service error.
 
         Args:
             message: Human-readable error message.
             status_code: HTTP status code to use in API responses.
+            details: Optional structured detail payload for API clients.
         """
         super().__init__(message)
         self.status_code = status_code
         self.message = message
+        self.details = details or {}
+
+    def to_detail(self) -> Dict[str, Any]:
+        """Return structured detail payload for HTTP error responses."""
+        payload = {"message": self.message}
+        payload.update(self.details)
+        return payload
 
 
 def _normalize_county_fips(county_fips: str) -> str:
@@ -91,6 +104,7 @@ class EvictionLabScoringService:
         self._cached_model: Optional[Any] = None
         self._cached_feature_df: Optional[pd.DataFrame] = None
         self._cached_metadata: Optional[Dict[str, Any]] = None
+        self._cached_year_scores: Dict[int, pd.Series] = {}
 
     def _load_model(self) -> Any:
         """Load and cache model artifact on first use."""
@@ -148,7 +162,6 @@ class EvictionLabScoringService:
         if metrics_payload is None:
             return None
 
-        # Keep the summary compact and stable for API consumers.
         summary_keys = [
             "auc",
             "precision_at_0_5",
@@ -236,6 +249,31 @@ class EvictionLabScoringService:
         self._cached_metadata = metadata_payload
         return metadata_payload
 
+    def _get_year_score_distribution(self, as_of_year: int) -> pd.Series:
+        """Return cached year-level score distribution for percentile context."""
+        if as_of_year in self._cached_year_scores:
+            return self._cached_year_scores[as_of_year]
+
+        model = self._load_model()
+        feature_df = self._load_feature_table()
+
+        year_df = feature_df[feature_df["year"] == as_of_year].copy()
+        year_df = year_df.dropna(subset=MODEL_FEATURE_COLUMNS)
+
+        if year_df.empty:
+            raise ScoringServiceError(
+                f"No scoreable rows found for as_of_year={as_of_year}.",
+                400,
+                details={"as_of_year_available": False},
+            )
+
+        year_scores = pd.Series(
+            model.predict_proba(year_df[MODEL_FEATURE_COLUMNS])[:, 1],
+            dtype="float64",
+        )
+        self._cached_year_scores[as_of_year] = year_scores
+        return year_scores
+
     def get_metadata(self) -> Dict[str, Any]:
         """Return metadata for API About/docs usage."""
         metadata = self._load_metadata().copy()
@@ -265,32 +303,80 @@ class EvictionLabScoringService:
 
         normalized_fips = _normalize_county_fips(county_fips)
 
-        available_years = sorted(feature_df["year"].unique().tolist())
-        if as_of_year not in available_years:
+        county_df = feature_df[feature_df["county_fips"] == normalized_fips].copy()
+        available_years_min: Optional[int] = None
+        available_years_max: Optional[int] = None
+
+        if not county_df.empty:
+            available_years_min = int(county_df["year"].min())
+            available_years_max = int(county_df["year"].max())
+
+        as_of_year_available = bool((county_df["year"] == as_of_year).any())
+        if not as_of_year_available:
+            if county_df.empty:
+                message = (
+                    "No rows found for county_fips in processed feature data. "
+                    "Try a county/year present in the feature table."
+                )
+            else:
+                county_years = sorted(county_df["year"].unique().tolist())
+                message = (
+                    "as_of_year is not available for this county. "
+                    f"Try one of the available years: {county_years}."
+                )
+
             raise ScoringServiceError(
-                "as_of_year is not present in processed feature data. "
-                f"Available years: {available_years}",
-                400,
+                message=message,
+                status_code=400,
+                details={
+                    "county_fips": normalized_fips,
+                    "as_of_year": int(as_of_year),
+                    "as_of_year_available": False,
+                    "available_years_min": available_years_min,
+                    "available_years_max": available_years_max,
+                },
             )
 
-        county_year_df = feature_df[
-            (feature_df["county_fips"] == normalized_fips)
-            & (feature_df["year"] == as_of_year)
-        ].copy()
-
+        county_year_df = county_df[county_df["year"] == as_of_year].copy()
         if county_year_df.empty:
             raise ScoringServiceError(
                 "No scoreable row found for the requested county_fips and as_of_year.",
                 400,
+                details={
+                    "county_fips": normalized_fips,
+                    "as_of_year": int(as_of_year),
+                    "as_of_year_available": False,
+                    "available_years_min": available_years_min,
+                    "available_years_max": available_years_max,
+                },
             )
 
         if county_year_df[MODEL_FEATURE_COLUMNS].isna().any(axis=None):
             raise ScoringServiceError(
                 "Requested county-year row has missing model features and cannot be scored.",
                 400,
+                details={
+                    "county_fips": normalized_fips,
+                    "as_of_year": int(as_of_year),
+                    "as_of_year_available": True,
+                    "available_years_min": available_years_min,
+                    "available_years_max": available_years_max,
+                },
             )
 
         risk_score = float(model.predict_proba(county_year_df[MODEL_FEATURE_COLUMNS])[:, 1][0])
+
+        year_scores = self._get_year_score_distribution(as_of_year)
+        risk_percentile = float((year_scores <= risk_score).mean() * 100.0)
+
+        feature_row = county_year_df.iloc[0]
+        features_used = {
+            "lag_1": float(feature_row["lag_1"]),
+            "lag_3_mean_obs": float(feature_row["lag_3_mean_obs"]),
+            "lag_5_mean_obs": float(feature_row["lag_5_mean_obs"]),
+            "years_since_last_obs": float(feature_row["years_since_last_obs"]),
+        }
+
         metadata = self._load_metadata()
 
         return {
@@ -299,6 +385,11 @@ class EvictionLabScoringService:
             "risk_score": risk_score,
             "model_version": str(metadata.get("model_version", "unknown")),
             "model_type": str(metadata.get("model_type", MODEL_TYPE)),
+            "as_of_year_available": True,
+            "available_years_min": available_years_min,
+            "available_years_max": available_years_max,
+            "risk_percentile_in_year": risk_percentile,
+            "features_used": features_used,
             "notes": None,
         }
 

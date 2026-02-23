@@ -35,6 +35,11 @@ Interactive docs:
 - `http://127.0.0.1:8000/docs`
 - `http://127.0.0.1:8000/redoc`
 
+`/score` responses now include demo-friendly context fields:
+- `features_used`: the four model inputs for that county-year.
+- `risk_percentile_in_year`: percentile rank (0-100) among scoreable counties in that year.
+- `as_of_year_available`, `available_years_min`, `available_years_max`: availability context for requested year/county.
+
 ## Environment variables
 
 - `PORT`: API server port for `serve_api` (default `8000`).
