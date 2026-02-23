@@ -15,6 +15,7 @@ from sklearn.pipeline import Pipeline
 from src.config import (
     EVICTION_LAB_BACKTEST_LAST_TWO_YEARS_PATH,
     EVICTION_LAB_BACKTEST_LAST_YEAR_PATH,
+    EVICTION_LAB_BACKTEST_SUMMARY_PATH,
     EVICTION_LAB_HOLDOUT_DETAIL_LAST_TWO_YEARS_PATH,
     EVICTION_LAB_HOLDOUT_DETAIL_LAST_YEAR_PATH,
     EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH,
@@ -60,6 +61,7 @@ from src.models.eviction_risk_model import (
     split_train_test_by_time,
     train_model,
 )
+from src.reporting.eviction_lab_backtest_report import write_backtest_summary_report
 
 
 LOGGER = logging.getLogger(__name__)
@@ -72,6 +74,7 @@ VALID_TASKS = [
     "score_eviction_lab_county",
     "backtest_eviction_lab_yearly",
     "train_eviction_lab_yearly_final",
+    "report_eviction_lab_backtest",
     "serve_api",
 ]
 
@@ -436,6 +439,17 @@ def run_train_eviction_lab_yearly_final() -> None:
     )
 
 
+def run_report_eviction_lab_backtest() -> None:
+    """Run yearly backtests and write a human-readable markdown summary report."""
+    _ensure_output_directories()
+
+    # Always refresh artifacts so the markdown report reflects current behavior.
+    run_backtest_eviction_lab_yearly()
+    write_backtest_summary_report(EVICTION_LAB_BACKTEST_SUMMARY_PATH)
+
+    LOGGER.info("Wrote backtest summary report to %s", EVICTION_LAB_BACKTEST_SUMMARY_PATH)
+
+
 def run_serve_api() -> None:
     """Run the FastAPI app with uvicorn for local development."""
     port_text = os.getenv("PORT", "8000").strip()
@@ -634,6 +648,10 @@ def main() -> None:
 
         if args.task == "train_eviction_lab_yearly_final":
             run_train_eviction_lab_yearly_final()
+            return
+
+        if args.task == "report_eviction_lab_backtest":
+            run_report_eviction_lab_backtest()
             return
 
         if args.task == "serve_api":

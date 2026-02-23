@@ -96,6 +96,12 @@ Run leakage-safe yearly backtests using outcome-year holdouts:
 python -m src.main --task backtest_eviction_lab_yearly
 ```
 
+Generate the full backtest markdown summary (also refreshes backtest artifacts):
+
+```bash
+python -m src.main --task report_eviction_lab_backtest
+```
+
 This command runs two evaluations:
 - Last outcome-year holdout (for example, 2018 when that is the latest year).
 - Last two outcome-years holdout (for example, 2017 and 2018).

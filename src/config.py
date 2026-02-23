@@ -41,3 +41,4 @@ EVICTION_LAB_HOLDOUT_DETAIL_LAST_YEAR_PATH: Path = (
 EVICTION_LAB_HOLDOUT_DETAIL_LAST_TWO_YEARS_PATH: Path = (
     REPORTS_DIR / "eviction_lab_yearly_holdout_detail_last_2_years.csv"
 )
+EVICTION_LAB_BACKTEST_SUMMARY_PATH: Path = REPORTS_DIR / "backtest_summary.md"
