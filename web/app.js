@@ -1,3 +1,7 @@
+const COUNTY_LOOKUP_PATH = "/demo/assets/county_fips_lookup.json";
+const FINDER_MIN_QUERY_LENGTH = 2;
+const FINDER_MAX_RESULTS = 12;
+
 (function initDemoSite() {
   setActiveNavLink();
   bindScoreForm();
@@ -29,6 +33,7 @@ function bindScoreForm() {
   const scoreButton = document.getElementById("score-button");
   const resultsCard = document.getElementById("results-card");
   const errorCard = document.getElementById("error-card");
+  bindCountyFinder(countyInput, yearInput);
   bindExampleButtons(countyInput, yearInput);
 
   form.addEventListener("submit", async (event) => {
@@ -79,6 +84,170 @@ function bindScoreForm() {
   });
 }
 
+function bindCountyFinder(countyInput, yearInput) {
+  const finderSection = document.getElementById("county-finder-section");
+  const finderInput = document.getElementById("county-finder-input");
+  const resultsContainer = document.getElementById("county-finder-results");
+  if (!finderSection || !finderInput || !resultsContainer) {
+    return;
+  }
+
+  let countyLookup = [];
+  let lookupLoaded = false;
+  let lookupFailed = false;
+
+  const closeResults = () => {
+    resultsContainer.classList.add("hidden");
+    resultsContainer.textContent = "";
+    finderInput.setAttribute("aria-expanded", "false");
+  };
+
+  const openResults = () => {
+    resultsContainer.classList.remove("hidden");
+    finderInput.setAttribute("aria-expanded", "true");
+  };
+
+  const renderEmptyState = (message) => {
+    resultsContainer.textContent = "";
+    const emptyItem = document.createElement("p");
+    emptyItem.className = "finder-empty";
+    emptyItem.textContent = message;
+    resultsContainer.appendChild(emptyItem);
+    openResults();
+  };
+
+  const renderMatchResults = (matches) => {
+    resultsContainer.textContent = "";
+
+    matches.forEach((record) => {
+      const rowButton = document.createElement("button");
+      rowButton.type = "button";
+      rowButton.className = "finder-result";
+      rowButton.dataset.fips = record.fips;
+      rowButton.dataset.selectedName = `${record.county_name}, ${record.state_abbr}`;
+      rowButton.textContent = `${formatCountyResultName(record.county_name)}, ${record.state_abbr} — ${record.fips}`;
+      resultsContainer.appendChild(rowButton);
+    });
+
+    openResults();
+  };
+
+  const ensureLookupLoaded = async () => {
+    if (lookupLoaded || lookupFailed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(COUNTY_LOOKUP_PATH);
+      if (!response.ok) {
+        throw new Error(`County lookup fetch failed with status ${response.status}`);
+      }
+
+      const payload = await response.json();
+      if (!Array.isArray(payload)) {
+        throw new Error("County lookup payload is not an array.");
+      }
+
+      countyLookup = payload
+        .filter(
+          (record) =>
+            record &&
+            typeof record.county_name === "string" &&
+            typeof record.state_abbr === "string" &&
+            typeof record.fips === "string",
+        )
+        .map((record) => ({
+          county_name: record.county_name.trim(),
+          state_abbr: record.state_abbr.trim(),
+          fips: record.fips.trim(),
+          normalized_county_name: normalizeFinderText(record.county_name),
+        }));
+
+      lookupLoaded = true;
+    } catch (error) {
+      lookupFailed = true;
+      console.error(error);
+    }
+  };
+
+  const updateResultsForQuery = async () => {
+    const rawQuery = finderInput.value.trim();
+    if (rawQuery.length < FINDER_MIN_QUERY_LENGTH) {
+      closeResults();
+      return;
+    }
+
+    await ensureLookupLoaded();
+    if (lookupFailed) {
+      renderEmptyState("County lookup is unavailable right now.");
+      return;
+    }
+
+    const normalizedQuery = normalizeFinderText(rawQuery);
+    if (normalizedQuery.length < FINDER_MIN_QUERY_LENGTH) {
+      closeResults();
+      return;
+    }
+
+    const startsWithMatches = [];
+    const containsMatches = [];
+    for (const record of countyLookup) {
+      if (record.normalized_county_name.startsWith(normalizedQuery)) {
+        startsWithMatches.push(record);
+      } else if (record.normalized_county_name.includes(normalizedQuery)) {
+        containsMatches.push(record);
+      }
+    }
+
+    const orderedMatches = [...startsWithMatches, ...containsMatches].slice(0, FINDER_MAX_RESULTS);
+    if (orderedMatches.length === 0) {
+      renderEmptyState("No matches found.");
+      return;
+    }
+
+    renderMatchResults(orderedMatches);
+  };
+
+  finderInput.addEventListener("input", () => {
+    updateResultsForQuery();
+  });
+
+  finderInput.addEventListener("focus", () => {
+    if (finderInput.value.trim().length >= FINDER_MIN_QUERY_LENGTH) {
+      updateResultsForQuery();
+    }
+  });
+
+  finderInput.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeResults();
+      finderInput.blur();
+    }
+  });
+
+  resultsContainer.addEventListener("click", (event) => {
+    const selectedButton = event.target.closest(".finder-result");
+    if (!(selectedButton instanceof HTMLElement)) {
+      return;
+    }
+
+    countyInput.value = selectedButton.dataset.fips || "";
+    finderInput.value = selectedButton.dataset.selectedName || finderInput.value;
+    closeResults();
+    yearInput.focus();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Node)) {
+      return;
+    }
+    if (finderSection.contains(event.target)) {
+      return;
+    }
+    closeResults();
+  });
+}
+
 function bindExampleButtons(countyInput, yearInput) {
   const exampleButtons = document.querySelectorAll(".example-button");
   if (!exampleButtons.length) {
@@ -92,6 +261,27 @@ function bindExampleButtons(countyInput, yearInput) {
       countyInput.focus();
     });
   });
+}
+
+function formatCountyResultName(countyName) {
+  const trimmedName = countyName.trim();
+  const hasCountySuffix = /(county|parish|borough|census area|municipality|city and borough|city|municipio)\b/i.test(
+    trimmedName,
+  );
+  if (hasCountySuffix) {
+    return trimmedName;
+  }
+  return `${trimmedName} County`;
+}
+
+function normalizeFinderText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function validateInputs(countyFips, asOfYearText) {

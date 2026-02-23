@@ -31,7 +31,7 @@
       <section class="hero card">
         <p class="eyebrow">Eviction Lab Yearly Risk API</p>
         <h1>Score one county and interpret the result in seconds.</h1>
-        <p class="subtitle">Use this demo to understand county-level relative risk, not to make high-stakes decisions.</p>
+        <p class="subtitle">Use this demo to understand county-level relative risk.</p>
       </section>
 
       <section class="card prose">
@@ -41,7 +41,26 @@
           <li>92nd percentile means higher risk than about 92% of counties for that year.</li>
           <li>Leave blank to use the latest available year for that county.</li>
         </ul>
-        <p class="small-disclaimer">Historical demo (outcomes through 2018). Not for high-stakes decisions.</p>
+        <p class="small-disclaimer">
+          Historical demo (outcomes through 2018). <a href="/demo/about.html">See About for limitations.</a>
+        </p>
+      </section>
+
+      <section class="card" id="county-finder-section">
+        <h2>Find your county</h2>
+        <label class="field" for="county-finder-input">
+          <span>County name lookup</span>
+          <input
+            id="county-finder-input"
+            type="text"
+            placeholder="Type a county name (e.g., Franklin, Los Angeles)"
+            autocomplete="off"
+            aria-controls="county-finder-results"
+            aria-expanded="false"
+          />
+        </label>
+        <p class="helper">Type at least 2 characters. Select a result to fill <code>county_fips</code>.</p>
+        <div id="county-finder-results" class="finder-results hidden" role="listbox" aria-label="County matches"></div>
       </section>
 
       <section class="card">

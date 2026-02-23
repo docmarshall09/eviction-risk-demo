@@ -265,6 +265,47 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.finder-results {
+  margin-top: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  max-height: 320px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.finder-result {
+  width: 100%;
+  height: auto;
+  padding: 0.72rem 0.8rem;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid #edf1fb;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.finder-result:last-child {
+  border-bottom: none;
+}
+
+.finder-result:hover {
+  background: #f3f7ff;
+  color: #1d3d79;
+}
+
+.finder-empty {
+  margin: 0;
+  padding: 0.72rem 0.8rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .example-button {
   height: 36px;
   border: 1px solid #cfddff;
