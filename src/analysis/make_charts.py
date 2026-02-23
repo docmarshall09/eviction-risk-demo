@@ -23,10 +23,23 @@ from src.models.eviction_lab_yearly_model import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ASSETS_DIR = PROJECT_ROOT / "web" / "assets"
+CHART_DPI = 240
+CHART_SIZE = (9.2, 5.6)
 
 # Use a headless backend so chart generation works in local/server environments.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+plt.rcParams.update(
+    {
+        "font.size": 12,
+        "axes.titlesize": 16,
+        "axes.labelsize": 13,
+        "xtick.labelsize": 11.5,
+        "ytick.labelsize": 11.5,
+        "legend.fontsize": 11,
+    }
+)
 
 
 def _build_labeled_feature_table() -> pd.DataFrame:
@@ -51,7 +64,7 @@ def _build_labeled_feature_table() -> pd.DataFrame:
 def _fit_and_score_holdout(
     labeled_df: pd.DataFrame,
     holdout_outcome_years: list[int],
-) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+) -> tuple[pd.DataFrame, pd.Series, pd.Series, pd.Series]:
     """Train on non-holdout outcome years, then return holdout scores."""
     train_df, test_df = split_by_outcome_year(
         labeled_df,
@@ -75,43 +88,75 @@ def _safe_auc(y_true: pd.Series, score: pd.Series) -> float:
     return float(roc_auc_score(y_true, score))
 
 
-def _plot_auc_comparison(
+def _plot_auc_delta_vs_baseline(
     auc_rows: list[dict[str, float | str]],
     output_path: Path,
 ) -> None:
-    """Bar chart: model vs naive lag_1 AUC across holdout setups."""
+    """Bar chart: delta AUC (model minus naive lag_1) across holdout setups."""
     labels = [str(row["label"]) for row in auc_rows]
     model_values = [float(row["model_auc"]) for row in auc_rows]
     naive_values = [float(row["naive_auc"]) for row in auc_rows]
+    delta_values = [model_auc - naive_auc for model_auc, naive_auc in zip(model_values, naive_values)]
 
     x_positions = range(len(labels))
-    width = 0.36
-
-    fig, axis = plt.subplots(figsize=(8.4, 4.8))
-    axis.bar(
-        [x - width / 2 for x in x_positions],
-        model_values,
-        width=width,
+    fig, axis = plt.subplots(figsize=CHART_SIZE)
+    bars = axis.bar(
+        x=list(x_positions),
+        height=delta_values,
+        width=0.54,
         color="#2f6bff",
-        label="Model",
-    )
-    axis.bar(
-        [x + width / 2 for x in x_positions],
-        naive_values,
-        width=width,
-        color="#9db7ff",
-        label="Naive lag_1",
+        edgecolor="#1f55ff",
+        linewidth=0.9,
     )
 
-    axis.set_title("Holdout AUC: Model vs Naive lag_1")
-    axis.set_ylabel("AUC")
+    axis.axhline(0.0, color="#6e7f9d", linewidth=1.2, linestyle="--")
+    axis.set_title("Delta AUC vs Naive lag_1 Baseline")
+    axis.set_ylabel("Delta AUC (Model - Naive)")
     axis.set_xticks(list(x_positions), labels)
-    axis.set_ylim(0.5, 1.0)
-    axis.grid(axis="y", alpha=0.25)
-    axis.legend(frameon=False)
+    axis.grid(axis="y", alpha=0.2, linewidth=0.9)
 
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=140)
+    min_delta = min(delta_values + [0.0])
+    max_delta = max(delta_values + [0.0])
+    delta_span = max_delta - min_delta
+    padding = max(0.0003, delta_span * 0.5 if delta_span > 0 else 0.0006)
+    axis.set_ylim(min_delta - padding, max_delta + padding)
+
+    label_offset = max(0.00003, padding * 0.04)
+    for bar, delta in zip(bars, delta_values):
+        text_y = delta + label_offset if delta >= 0 else delta - label_offset
+        vertical_align = "bottom" if delta >= 0 else "top"
+        delta_text = f"{delta:+.4f}\n{delta * 10000:+.0f} bps"
+        axis.text(
+            bar.get_x() + bar.get_width() / 2,
+            text_y,
+            delta_text,
+            ha="center",
+            va=vertical_align,
+            fontsize=11,
+            fontweight=600,
+            color="#17386e",
+        )
+
+    absolute_auc_lines = [
+        f"{label}: Model {model_auc:.4f}, Naive {naive_auc:.4f}"
+        for label, model_auc, naive_auc in zip(labels, model_values, naive_values)
+    ]
+    absolute_auc_text = "Absolute AUCs\n" + "\n".join(absolute_auc_lines)
+    fig.text(
+        0.02,
+        0.02,
+        absolute_auc_text,
+        fontsize=10.5,
+        color="#27406b",
+        bbox={
+            "boxstyle": "round,pad=0.35",
+            "facecolor": "#f4f8ff",
+            "edgecolor": "#cfdbf7",
+        },
+    )
+
+    fig.tight_layout(rect=(0, 0.14, 1, 1))
+    fig.savefig(output_path, dpi=CHART_DPI)
     plt.close(fig)
 
 
@@ -137,12 +182,12 @@ def _plot_calibration_curve(y_true: pd.Series, y_prob: pd.Series, output_path: P
     )
     grouped = grouped.sort_values("mean_pred")
 
-    fig, axis = plt.subplots(figsize=(7.8, 4.8))
+    fig, axis = plt.subplots(figsize=CHART_SIZE)
     axis.plot(
         [0, 1],
         [0, 1],
         linestyle="--",
-        linewidth=1.2,
+        linewidth=1.5,
         color="#8aa2cf",
         label="Perfect calibration",
     )
@@ -150,7 +195,8 @@ def _plot_calibration_curve(y_true: pd.Series, y_prob: pd.Series, output_path: P
         grouped["mean_pred"],
         grouped["observed_rate"],
         marker="o",
-        linewidth=2.0,
+        markersize=6.5,
+        linewidth=2.6,
         color="#2f6bff",
         label="Model bins",
     )
@@ -160,11 +206,11 @@ def _plot_calibration_curve(y_true: pd.Series, y_prob: pd.Series, output_path: P
     axis.set_ylabel("Observed top-quartile rate")
     axis.set_xlim(0, 1)
     axis.set_ylim(0, 1)
-    axis.grid(alpha=0.25)
+    axis.grid(alpha=0.2, linewidth=0.9)
     axis.legend(frameon=False)
 
     fig.tight_layout()
-    fig.savefig(output_path, dpi=140)
+    fig.savefig(output_path, dpi=CHART_DPI)
     plt.close(fig)
 
 
@@ -175,7 +221,7 @@ def _plot_roc_curve(
     output_path: Path,
 ) -> None:
     """ROC plot for model and naive lag_1 baseline."""
-    fig, axis = plt.subplots(figsize=(7.8, 4.8))
+    fig, axis = plt.subplots(figsize=CHART_SIZE)
 
     if y_true.nunique() >= 2:
         model_fpr, model_tpr, _ = roc_curve(y_true, model_score)
@@ -183,27 +229,33 @@ def _plot_roc_curve(
         model_auc = roc_auc_score(y_true, model_score)
         naive_auc = roc_auc_score(y_true, naive_score)
 
-        axis.plot(model_fpr, model_tpr, color="#2f6bff", linewidth=2.0, label=f"Model (AUC {model_auc:.3f})")
+        axis.plot(
+            model_fpr,
+            model_tpr,
+            color="#2f6bff",
+            linewidth=2.6,
+            label=f"Model (AUC {model_auc:.4f})",
+        )
         axis.plot(
             naive_fpr,
             naive_tpr,
             color="#9db7ff",
-            linewidth=2.0,
+            linewidth=2.6,
             linestyle="--",
-            label=f"Naive lag_1 (AUC {naive_auc:.3f})",
+            label=f"Naive lag_1 (AUC {naive_auc:.4f})",
         )
 
-    axis.plot([0, 1], [0, 1], color="#8aa2cf", linestyle=":", linewidth=1.3, label="Chance")
+    axis.plot([0, 1], [0, 1], color="#8aa2cf", linestyle=":", linewidth=1.6, label="Chance")
     axis.set_title("ROC Curve on Last-2-Years Holdout")
     axis.set_xlabel("False positive rate")
     axis.set_ylabel("True positive rate")
     axis.set_xlim(0, 1)
     axis.set_ylim(0, 1)
-    axis.grid(alpha=0.25)
+    axis.grid(alpha=0.2, linewidth=0.9)
     axis.legend(frameon=False, loc="lower right")
 
     fig.tight_layout()
-    fig.savefig(output_path, dpi=140)
+    fig.savefig(output_path, dpi=CHART_DPI)
     plt.close(fig)
 
 
@@ -230,18 +282,18 @@ def main() -> None:
 
     auc_rows = [
         {
-            "label": f"Last year ({last_year})",
+            "label": f"Last year holdout ({last_year})",
             "model_auc": _safe_auc(y_last_year, model_last_year),
             "naive_auc": _safe_auc(y_last_year, naive_last_year),
         },
         {
-            "label": f"Last 2 years ({last_two[0]}-{last_two[1]})",
+            "label": f"Last 2 years pooled ({last_two[0]}-{last_two[1]})",
             "model_auc": _safe_auc(y_last_two, model_last_two),
             "naive_auc": _safe_auc(y_last_two, naive_last_two),
         },
     ]
 
-    _plot_auc_comparison(
+    _plot_auc_delta_vs_baseline(
         auc_rows=auc_rows,
         output_path=ASSETS_DIR / "analysis_model_vs_naive_auc.png",
     )

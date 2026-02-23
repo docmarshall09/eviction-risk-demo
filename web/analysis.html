@@ -47,17 +47,33 @@
         </ul>
       </section>
 
+      <section class="card prose">
+        <h2>Metric glossary</h2>
+        <p>
+          <strong>ROC</strong> is a threshold tradeoff curve: it shows how true positive rate changes versus false
+          positive rate as you sweep the score cutoff.
+        </p>
+        <p>
+          <strong>AUC</strong> is the area under the ROC curve. An AUC of <code>0.5</code> is random ranking and an
+          AUC of <code>1.0</code> is perfect ranking. You can also read AUC as the probability that a randomly chosen
+          positive county is ranked above a randomly chosen negative county.
+        </p>
+        <p>
+          <strong>Calibration</strong> asks whether predicted probabilities match observed frequencies in real data.
+        </p>
+      </section>
+
       <section class="card">
         <h2>Performance</h2>
         <div class="analysis-grid">
           <figure class="figure-card">
             <img
               src="/demo/assets/analysis_model_vs_naive_auc.png"
-              alt="Bar chart comparing model AUC versus naive lag-1 baseline on holdout windows."
+              alt="Bar chart showing delta AUC between model and naive lag-1 baseline on holdout windows."
             />
             <figcaption>
-              The model outperforms the naive lag_1 baseline on holdout windows, but the baseline remains competitive.
-              This indicates persistent signal in recent filing-rate history.
+              This chart highlights the AUC lift over a naive lag_1 baseline directly (delta AUC), so small differences
+              are readable at a glance. Labels show both decimal lift and basis points (bps).
             </figcaption>
           </figure>
 
