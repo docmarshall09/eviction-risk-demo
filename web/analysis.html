@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analysis | Cosign Eviction Risk Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/demo/styles.css" />
+    <script src="/demo/app.js" defer></script>
+  </head>
+  <body data-page="analysis">
+    <header class="site-nav">
+      <div class="site-nav-inner container">
+        <a href="/demo/" class="brand">Cosign Eviction Risk Demo</a>
+        <nav class="nav-links" aria-label="Main">
+          <a data-nav="demo" href="/demo/">Demo</a>
+          <a data-nav="about" href="/demo/about.html">About</a>
+          <a data-nav="analysis" href="/demo/analysis.html">Analysis</a>
+          <a data-nav="api" href="/demo/api.html">API</a>
+          <a href="/docs" target="_blank" rel="noopener">Swagger</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero card">
+        <p class="eyebrow">Backtest Analysis</p>
+        <h1>How the model performed on held-out outcome years.</h1>
+        <p class="subtitle">
+          These charts summarize relative performance and calibration from a leakage-safe holdout setup.
+        </p>
+      </section>
+
+      <section class="card prose">
+        <h2>Key findings</h2>
+        <ul>
+          <li>The model performed strongly in holdout backtests and separated higher-risk counties well.</li>
+          <li>A simple naive baseline using only <code>lag_1</code> remained close in performance.</li>
+          <li>That gap pattern suggests eviction filing risk has persistence year-over-year.</li>
+          <li>Calibration trends are directionally reasonable but not perfect at every score band.</li>
+          <li>Outcomes in this dataset end in 2018, so results reflect historical behavior only.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Performance</h2>
+        <div class="analysis-grid">
+          <figure class="figure-card">
+            <img
+              src="/demo/assets/analysis_model_vs_naive_auc.png"
+              alt="Bar chart comparing model AUC versus naive lag-1 baseline on holdout windows."
+            />
+            <figcaption>
+              The model outperforms the naive lag_1 baseline on holdout windows, but the baseline remains competitive.
+              This indicates persistent signal in recent filing-rate history.
+            </figcaption>
+          </figure>
+
+          <figure class="figure-card">
+            <img
+              src="/demo/assets/analysis_calibration_curve.png"
+              alt="Calibration curve comparing predicted risk bins to observed outcome rates."
+            />
+            <figcaption>
+              The calibration curve compares predicted risk bins to observed top-quartile rates. Closer alignment to
+              the diagonal means probabilities are better calibrated.
+            </figcaption>
+          </figure>
+
+          <figure class="figure-card">
+            <img src="/demo/assets/analysis_roc_curve.png" alt="ROC curve for model and naive lag-1 baseline." />
+            <figcaption>
+              The ROC chart shows ranking performance across thresholds. Higher curves indicate better discrimination
+              between counties that did and did not land in the top-risk quartile.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="card prose">
+        <h2>Reproducibility</h2>
+        <p>
+          Regenerate these charts locally with <code>python -m src.analysis.make_charts</code>. The script expects the
+          Eviction Lab CSV at <code>data/raw/county_proprietary_valid_2000_2018.csv</code>.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
