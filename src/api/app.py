@@ -26,7 +26,7 @@ def _get_cors_origins_from_env() -> list[str]:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application instance."""
     app = FastAPI(
-        title="Cosign Public Data POC API",
+        title="Eviction Risk Demo API",
         version="0.1.0",
         description="HTTP API for Eviction Lab yearly county risk scoring.",
     )

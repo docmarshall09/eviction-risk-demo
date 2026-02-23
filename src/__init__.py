@@ -1,1 +1,1 @@
-"""Top-level package for the cosign public-data POC."""
+"""Top-level package for the eviction risk demo project."""

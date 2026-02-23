@@ -1,4 +1,4 @@
-# cosign-public-data-poc
+# eviction-risk-demo
 
 This repository is a public-data underwriting risk proof of concept in Python.
 It includes a monthly county pipeline and a parallel yearly Eviction Lab pipeline for county-level context risk scoring.
@@ -151,4 +151,4 @@ python -m src.main --task score_eviction_lab_latest_year
 
 ## Next steps
 
-Next, we will join these county-level context scores to applicant-level Cosign underwriting features and expand the modeling baseline.
+Next, we will expand this county-level context modeling baseline with additional portfolio use cases.

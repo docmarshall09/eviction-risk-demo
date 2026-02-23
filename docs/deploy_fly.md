@@ -1,6 +1,6 @@
 # Deploy to Fly.io
 
-Run these commands from the repo root (`/Users/marshalldeese/Projects/cosign-public-data-poc`).
+Run these commands from the repo root (`<repo-root>`).
 
 ## Build behavior note
 
@@ -10,7 +10,7 @@ Run these commands from the repo root (`/Users/marshalldeese/Projects/cosign-pub
 - The final runtime image excludes the raw Eviction Lab CSV.
 
 ```bash
-export APP=cosign-public-data-poc-demo
+export APP=eviction-risk-demo
 export REGION=iad
 
 # 1) Login
