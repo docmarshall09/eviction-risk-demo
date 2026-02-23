@@ -182,6 +182,42 @@ def _to_markdown_table(df: pd.DataFrame) -> str:
     return "\n".join([header_line, separator_line, *data_lines])
 
 
+def _score_distribution_rows(detail_df: pd.DataFrame) -> pd.DataFrame:
+    """Build score-distribution summary rows by outcome year and pooled."""
+    rows: list[dict[str, Any]] = []
+
+    for outcome_year, group_df in detail_df.groupby("outcome_year"):
+        score_series = group_df["risk_score"]
+        rows.append(
+            {
+                "outcome_year": int(outcome_year),
+                "p01": float(score_series.quantile(0.01)),
+                "p05": float(score_series.quantile(0.05)),
+                "p50": float(score_series.quantile(0.50)),
+                "p95": float(score_series.quantile(0.95)),
+                "p99": float(score_series.quantile(0.99)),
+                "share_gt_0_99": float((score_series > 0.99).mean()),
+                "share_lt_0_01": float((score_series < 0.01).mean()),
+            }
+        )
+
+    pooled_scores = detail_df["risk_score"]
+    rows.append(
+        {
+            "outcome_year": "pooled",
+            "p01": float(pooled_scores.quantile(0.01)),
+            "p05": float(pooled_scores.quantile(0.05)),
+            "p50": float(pooled_scores.quantile(0.50)),
+            "p95": float(pooled_scores.quantile(0.95)),
+            "p99": float(pooled_scores.quantile(0.99)),
+            "share_gt_0_99": float((pooled_scores > 0.99).mean()),
+            "share_lt_0_01": float((pooled_scores < 0.01).mean()),
+        }
+    )
+
+    return pd.DataFrame(rows)
+
+
 def _build_executive_summary(
     model_2018: Dict[str, Any],
     model_last_two: Dict[str, Any],
@@ -230,7 +266,11 @@ def generate_backtest_summary_markdown(
         prediction_column="predicted_top_quartile",
     )
 
-    model_2018_row = model_year_table[model_year_table["outcome_year"] == 2018]
+    model_2018_table = _build_year_summary_rows(
+        detail_df=last_year_detail,
+        prediction_column="predicted_top_quartile",
+    )
+    model_2018_row = model_2018_table[model_2018_table["outcome_year"] == 2018]
     if model_2018_row.empty:
         raise ValueError("Outcome year 2018 not found in holdout detail report.")
     model_2018 = model_2018_row.iloc[0].to_dict()
@@ -296,6 +336,16 @@ def generate_backtest_summary_markdown(
     ].map(_format_pct)
     naive_year_display["auc"] = naive_year_display["auc"].map(_format_auc)
 
+    score_distribution_display = _score_distribution_rows(last_two_detail)
+    for percentile_column in ["p01", "p05", "p50", "p95", "p99"]:
+        score_distribution_display[percentile_column] = score_distribution_display[
+            percentile_column
+        ].map(lambda value: f"{value:.4f}")
+    for share_column in ["share_gt_0_99", "share_lt_0_01"]:
+        score_distribution_display[share_column] = score_distribution_display[
+            share_column
+        ].map(_format_pct)
+
     lines: list[str] = []
     lines.append("# Eviction Lab Yearly Backtest Summary")
     lines.append("")
@@ -354,6 +404,13 @@ def generate_backtest_summary_markdown(
         f"{_format_pct(float(last_two_overall.get('precision_at_top_quartile', 0.0)))}/"
         f"{_format_pct(float(last_two_overall.get('recall_at_top_quartile', 0.0)))}/"
         f"{_format_auc(last_two_overall.get('auc'))}."
+    )
+    lines.append("")
+    lines.append("### Score distribution (holdout years)")
+    lines.append(_to_markdown_table(score_distribution_display))
+    lines.append(
+        "Calibration note: calibrated probabilities reduce overconfident extremes by "
+        "aligning predicted probabilities with observed event frequencies on a time-respecting training-period split."
     )
     lines.append("")
 

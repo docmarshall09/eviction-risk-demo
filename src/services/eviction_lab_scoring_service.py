@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
 
 from src.config import (
     EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH,
@@ -89,11 +88,11 @@ class EvictionLabScoringService:
         self._metadata_path = metadata_path
         self._metrics_path = metrics_path
 
-        self._cached_model: Optional[LogisticRegression] = None
+        self._cached_model: Optional[Any] = None
         self._cached_feature_df: Optional[pd.DataFrame] = None
         self._cached_metadata: Optional[Dict[str, Any]] = None
 
-    def _load_model(self) -> LogisticRegression:
+    def _load_model(self) -> Any:
         """Load and cache model artifact on first use."""
         if self._cached_model is not None:
             return self._cached_model

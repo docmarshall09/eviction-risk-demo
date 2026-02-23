@@ -7,9 +7,9 @@ import logging
 import os
 from pathlib import Path
 import subprocess
+from typing import Any
 
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
 from src.config import (
@@ -45,6 +45,7 @@ from src.models.eviction_lab_yearly_model import (
     build_holdout_detail,
     evaluate_at_top_quartile,
     evaluate_eviction_lab_yearly_model,
+    get_model_training_details,
     load_eviction_lab_yearly_model,
     save_eviction_lab_yearly_model,
     score_counties_yearly,
@@ -270,6 +271,7 @@ def _summarize_metrics_for_metadata(metrics_payload: dict | None) -> dict | None
 def _build_yearly_model_metadata_payload(
     training_df: pd.DataFrame,
     metrics_payload: dict | None,
+    model_training_details: dict,
 ) -> dict:
     """Build yearly model metadata payload for API docs and scoring responses."""
     model_version = _build_model_version()
@@ -295,6 +297,12 @@ def _build_yearly_model_metadata_payload(
         "label_definition": "Top-quartile filing_rate in year t+1 across counties.",
         "feature_list": MODEL_FEATURE_COLUMNS,
         "metrics_summary": _summarize_metrics_for_metadata(metrics_payload),
+        "chosen_regularization_c": model_training_details.get("chosen_regularization_c"),
+        "regularization_candidates": model_training_details.get(
+            "regularization_candidates"
+        ),
+        "calibration_method": model_training_details.get("calibration_method"),
+        "calibration_time_values": model_training_details.get("calibration_time_values"),
         "limitations": [
             "Dataset ends at 2018 outcome year.",
             "Irregular county-year panel without gap filling.",
@@ -303,9 +311,17 @@ def _build_yearly_model_metadata_payload(
     }
 
 
-def _write_yearly_model_metadata(training_df: pd.DataFrame, metrics_payload: dict | None) -> None:
+def _write_yearly_model_metadata(
+    training_df: pd.DataFrame,
+    metrics_payload: dict | None,
+    model_training_details: dict,
+) -> None:
     """Write yearly model metadata artifact used by API metadata endpoint."""
-    metadata_payload = _build_yearly_model_metadata_payload(training_df, metrics_payload)
+    metadata_payload = _build_yearly_model_metadata_payload(
+        training_df=training_df,
+        metrics_payload=metrics_payload,
+        model_training_details=model_training_details,
+    )
     _write_json_report(EVICTION_LAB_YEARLY_MODEL_METADATA_PATH, metadata_payload)
 
 
@@ -349,10 +365,15 @@ def run_train_eviction_lab_yearly() -> None:
     train_df, test_df = split_train_test_by_year(labeled_df)
     model = train_eviction_lab_yearly_model(train_df)
     metrics = evaluate_eviction_lab_yearly_model(model, test_df)
+    model_training_details = get_model_training_details(model)
 
     save_eviction_lab_yearly_model(model, str(EVICTION_LAB_YEARLY_MODEL_PATH))
     _write_json_report(EVICTION_LAB_YEARLY_METRICS_PATH, metrics)
-    _write_yearly_model_metadata(training_df=train_df, metrics_payload=metrics)
+    _write_yearly_model_metadata(
+        training_df=train_df,
+        metrics_payload=metrics,
+        model_training_details=model_training_details,
+    )
 
     LOGGER.info("Saved yearly model to %s", EVICTION_LAB_YEARLY_MODEL_PATH)
     LOGGER.info("Saved yearly metrics to %s", EVICTION_LAB_YEARLY_METRICS_PATH)
@@ -429,7 +450,12 @@ def run_train_eviction_lab_yearly_final() -> None:
     model = train_eviction_lab_yearly_model(labeled_df)
     save_eviction_lab_yearly_model(model, str(EVICTION_LAB_YEARLY_MODEL_PATH))
     prior_metrics = _read_json_report_if_exists(EVICTION_LAB_YEARLY_METRICS_PATH)
-    _write_yearly_model_metadata(training_df=labeled_df, metrics_payload=prior_metrics)
+    model_training_details = get_model_training_details(model)
+    _write_yearly_model_metadata(
+        training_df=labeled_df,
+        metrics_payload=prior_metrics,
+        model_training_details=model_training_details,
+    )
 
     LOGGER.info("Trained final yearly model on %d labeled rows.", len(labeled_df))
     LOGGER.info("Saved final yearly model to %s", EVICTION_LAB_YEARLY_MODEL_PATH)
@@ -476,7 +502,7 @@ def _load_monthly_model_or_raise(model_path: Path) -> Pipeline:
     return load_model(str(model_path))
 
 
-def _load_yearly_model_or_raise(model_path: Path) -> LogisticRegression:
+def _load_yearly_model_or_raise(model_path: Path) -> Any:
     """Load yearly model and raise a clear error when missing."""
     if not model_path.exists():
         raise FileNotFoundError(

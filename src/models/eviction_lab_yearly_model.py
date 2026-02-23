@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import joblib
 import pandas as pd
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_score, recall_score, roc_auc_score
 
@@ -19,6 +20,10 @@ MODEL_FEATURE_COLUMNS = [
 PROBABILITY_THRESHOLD = 0.5
 TEST_YEARS = 2
 CALIBRATION_DECILES = 10
+DEFAULT_LOGISTIC_C = 0.3
+LOGISTIC_C_GRID = [0.1, 0.3, 1.0]
+MIN_ROWS_FOR_ISOTONIC = 1000
+MIN_CLASS_ROWS_FOR_ISOTONIC = 200
 
 
 def _get_labeled_rows(feature_df: pd.DataFrame) -> pd.DataFrame:
@@ -27,6 +32,108 @@ def _get_labeled_rows(feature_df: pd.DataFrame) -> pd.DataFrame:
     labeled_df = feature_df.dropna(subset=required_columns).copy()
     labeled_df["y"] = labeled_df["y"].astype(int)
     return labeled_df
+
+
+def _time_column_for_training(df: pd.DataFrame) -> str:
+    """Return the preferred time column for train/calibration splits."""
+    if "outcome_year" in df.columns:
+        return "outcome_year"
+    return "year"
+
+
+def _split_fit_and_calibration_by_time(train_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Split training rows into fit and calibration subsets by latest time bucket."""
+    time_column = _time_column_for_training(train_df)
+    unique_time_values = sorted(train_df[time_column].unique().tolist())
+
+    if len(unique_time_values) < 2:
+        raise ValueError(
+            "Need at least two time buckets for leakage-safe calibration. "
+            f"Found {len(unique_time_values)} in column {time_column}."
+        )
+
+    calibration_time_value = unique_time_values[-1]
+    fit_df = train_df[train_df[time_column] < calibration_time_value].copy()
+    calibration_df = train_df[train_df[time_column] == calibration_time_value].copy()
+
+    if fit_df.empty or calibration_df.empty:
+        raise ValueError("Failed to build non-empty fit/calibration split.")
+
+    return fit_df, calibration_df
+
+
+def _safe_auc(y_true: pd.Series, score: pd.Series) -> Optional[float]:
+    """Compute AUC only when both classes are present."""
+    if y_true.nunique() < 2:
+        return None
+    return float(roc_auc_score(y_true, score))
+
+
+def _select_regularization_c(fit_df: pd.DataFrame, calibration_df: pd.DataFrame) -> float:
+    """Select logistic C using calibration AUC, fallback to conservative default."""
+    calibration_auc_available = calibration_df["y"].nunique() >= 2
+    if not calibration_auc_available:
+        return DEFAULT_LOGISTIC_C
+
+    best_c = DEFAULT_LOGISTIC_C
+    best_auc = float("-inf")
+
+    for candidate_c in LOGISTIC_C_GRID:
+        model = LogisticRegression(C=candidate_c, max_iter=1000)
+        model.fit(
+            fit_df[MODEL_FEATURE_COLUMNS],
+            fit_df["y"],
+            sample_weight=fit_df["sample_weight"],
+        )
+
+        candidate_score = pd.Series(
+            model.predict_proba(calibration_df[MODEL_FEATURE_COLUMNS])[:, 1]
+        )
+        candidate_auc = _safe_auc(calibration_df["y"], candidate_score)
+
+        if candidate_auc is None:
+            continue
+
+        # Break ties toward lower C for more conservative coefficients.
+        if candidate_auc > best_auc or (
+            math.isclose(candidate_auc, best_auc, rel_tol=1e-12)
+            and candidate_c < best_c
+        ):
+            best_auc = candidate_auc
+            best_c = candidate_c
+
+    return float(best_c)
+
+
+def _select_calibration_method(calibration_df: pd.DataFrame) -> str:
+    """Choose isotonic when data is large enough, else sigmoid."""
+    class_counts = calibration_df["y"].value_counts()
+    if len(class_counts) < 2:
+        return "sigmoid"
+
+    if (
+        len(calibration_df) >= MIN_ROWS_FOR_ISOTONIC
+        and int(class_counts.min()) >= MIN_CLASS_ROWS_FOR_ISOTONIC
+    ):
+        return "isotonic"
+
+    return "sigmoid"
+
+
+def _build_prefit_calibrator(base_model: LogisticRegression, method: str) -> CalibratedClassifierCV:
+    """Create a prefit calibrator compatible across sklearn versions."""
+    try:
+        from sklearn.frozen import FrozenEstimator
+
+        frozen_estimator = FrozenEstimator(base_model)
+        return CalibratedClassifierCV(estimator=frozen_estimator, method=method)
+    except (ImportError, ModuleNotFoundError):
+        pass
+
+    try:
+        return CalibratedClassifierCV(estimator=base_model, method=method, cv="prefit")
+    except TypeError:
+        return CalibratedClassifierCV(base_estimator=base_model, method=method, cv="prefit")
 
 
 def split_train_test_by_year(
@@ -84,8 +191,8 @@ def split_by_outcome_year(
     return train_df, test_df
 
 
-def train_eviction_lab_yearly_model(train_df: pd.DataFrame) -> LogisticRegression:
-    """Train a logistic regression model using sample weights."""
+def train_eviction_lab_yearly_model(train_df: pd.DataFrame) -> Any:
+    """Train a calibrated logistic regression model with conservative regularization."""
     labeled_train_df = _get_labeled_rows(train_df)
     unique_classes = sorted(labeled_train_df["y"].unique().tolist())
     if len(unique_classes) < 2:
@@ -94,13 +201,48 @@ def train_eviction_lab_yearly_model(train_df: pd.DataFrame) -> LogisticRegressio
             f"Found classes: {unique_classes}."
         )
 
-    model = LogisticRegression(max_iter=1000)
-    model.fit(
-        labeled_train_df[MODEL_FEATURE_COLUMNS],
-        labeled_train_df["y"],
-        sample_weight=labeled_train_df["sample_weight"],
+    fit_df, calibration_df = _split_fit_and_calibration_by_time(labeled_train_df)
+    chosen_c = _select_regularization_c(fit_df=fit_df, calibration_df=calibration_df)
+
+    base_model = LogisticRegression(C=chosen_c, max_iter=1000)
+    base_model.fit(
+        fit_df[MODEL_FEATURE_COLUMNS],
+        fit_df["y"],
+        sample_weight=fit_df["sample_weight"],
     )
-    return model
+
+    calibration_method = _select_calibration_method(calibration_df)
+    calibrated_model = _build_prefit_calibrator(base_model, method=calibration_method)
+    calibrated_model.fit(
+        calibration_df[MODEL_FEATURE_COLUMNS],
+        calibration_df["y"],
+    )
+
+    # Store training details on the model for metadata/reporting.
+    setattr(calibrated_model, "chosen_regularization_c", float(chosen_c))
+    setattr(calibrated_model, "regularization_candidates", list(LOGISTIC_C_GRID))
+    setattr(calibrated_model, "calibration_method", calibration_method)
+    setattr(
+        calibrated_model,
+        "calibration_time_values",
+        sorted(calibration_df[_time_column_for_training(calibration_df)].unique().tolist()),
+    )
+
+    return calibrated_model
+
+
+def get_model_training_details(model: Any) -> Dict[str, Any]:
+    """Extract model-training details stored on trained model objects."""
+    return {
+        "chosen_regularization_c": float(
+            getattr(model, "chosen_regularization_c", DEFAULT_LOGISTIC_C)
+        ),
+        "regularization_candidates": list(
+            getattr(model, "regularization_candidates", LOGISTIC_C_GRID)
+        ),
+        "calibration_method": str(getattr(model, "calibration_method", "sigmoid")),
+        "calibration_time_values": list(getattr(model, "calibration_time_values", [])),
+    }
 
 
 def _build_calibration_summary(
@@ -149,7 +291,7 @@ def _build_calibration_summary(
 
 
 def evaluate_eviction_lab_yearly_model(
-    model: LogisticRegression,
+    model: Any,
     test_df: pd.DataFrame,
 ) -> Dict[str, Any]:
     """Evaluate yearly model on holdout years with threshold 0.5 metrics."""
@@ -181,6 +323,7 @@ def evaluate_eviction_lab_yearly_model(
         "precision_at_0_5": precision,
         "recall_at_0_5": recall,
         "calibration_by_decile": calibration_summary,
+        "model_training_details": get_model_training_details(model),
         "note": "AUC is null when the test set contains a single class.",
     }
 
@@ -190,7 +333,7 @@ def _flag_top_quartile_predictions(detail_df: pd.DataFrame) -> pd.DataFrame:
     flagged_df = detail_df.copy()
     flagged_df["predicted_top_quartile"] = 0
 
-    for outcome_year, group_df in flagged_df.groupby("outcome_year"):
+    for _, group_df in flagged_df.groupby("outcome_year"):
         top_count = max(1, int(math.ceil(0.25 * len(group_df))))
         top_index = group_df.sort_values("risk_score", ascending=False).head(top_count).index
         flagged_df.loc[top_index, "predicted_top_quartile"] = 1
@@ -199,7 +342,7 @@ def _flag_top_quartile_predictions(detail_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_holdout_detail(
-    model: LogisticRegression,
+    model: Any,
     test_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Create per-county holdout detail rows for backtesting reports."""
@@ -247,7 +390,7 @@ def _build_top_quartile_metrics_for_slice(slice_df: pd.DataFrame) -> Dict[str, A
 
 
 def evaluate_at_top_quartile(
-    model: LogisticRegression,
+    model: Any,
     test_df: pd.DataFrame,
 ) -> Dict[str, Any]:
     """Evaluate model by top-quartile ranking within each outcome year."""
@@ -268,25 +411,26 @@ def evaluate_at_top_quartile(
         "test_rows": int(len(detail_df)),
         "per_outcome_year": per_year_metrics,
         "overall": pooled_metrics,
+        "model_training_details": get_model_training_details(model),
         "note": "AUC is null for slices with a single observed class.",
     }
 
 
-def save_eviction_lab_yearly_model(model: LogisticRegression, path: str) -> None:
+def save_eviction_lab_yearly_model(model: Any, path: str) -> None:
     """Persist the trained yearly model to disk with joblib."""
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, output_path)
 
 
-def load_eviction_lab_yearly_model(path: str) -> LogisticRegression:
+def load_eviction_lab_yearly_model(path: str) -> Any:
     """Load a trained yearly model from disk."""
     loaded_model = joblib.load(path)
     return loaded_model
 
 
 def score_counties_yearly(
-    model: LogisticRegression,
+    model: Any,
     feature_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Score county-year rows and return risk_score outputs."""
@@ -298,7 +442,7 @@ def score_counties_yearly(
 
 
 def score_latest_year(
-    model: LogisticRegression,
+    model: Any,
     feature_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Score all counties for the latest year in the feature table."""
