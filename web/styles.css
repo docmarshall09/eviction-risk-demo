@@ -247,6 +247,76 @@ button:disabled {
   font-size: 0.92rem;
 }
 
+.small-disclaimer {
+  margin: 0.25rem 0 0;
+  color: #355079;
+  border: 1px solid #d6e4ff;
+  background: #f1f6ff;
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.quick-examples {
+  margin-top: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.example-button {
+  height: 36px;
+  border: 1px solid #cfddff;
+  background: #eef3ff;
+  color: #1d3d79;
+  border-radius: 999px;
+  padding: 0 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.example-button:hover {
+  background: #e2ecff;
+  border-color: #bfd2ff;
+}
+
+.target-line {
+  margin: 0.15rem 0 0;
+  color: #2c4574;
+  border: 1px solid #d7e4ff;
+  background: #f3f7ff;
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.93rem;
+}
+
+.primary-metric {
+  margin-top: 0.95rem;
+  border: 1px solid #c9dbff;
+  border-radius: 16px;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f7faff 0%, #edf4ff 100%);
+}
+
+.primary-metric-value {
+  margin: 0;
+  font-size: clamp(1.7rem, 4vw, 2.45rem);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1d4fd6;
+}
+
+.secondary-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
 .error-card {
   border-color: #f2d6d6;
   background: #fff6f6;
@@ -294,6 +364,12 @@ button:disabled {
   font-size: 1.1rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+.metric-copy {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .details-panel {
@@ -401,7 +477,8 @@ code {
   }
 
   .form-grid,
-  .metrics-grid {
+  .metrics-grid,
+  .secondary-grid {
     grid-template-columns: 1fr;
   }
 

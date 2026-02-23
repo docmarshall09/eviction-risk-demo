@@ -29,6 +29,7 @@ function bindScoreForm() {
   const scoreButton = document.getElementById("score-button");
   const resultsCard = document.getElementById("results-card");
   const errorCard = document.getElementById("error-card");
+  bindExampleButtons(countyInput, yearInput);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -75,6 +76,21 @@ function bindScoreForm() {
     } finally {
       setLoadingState(scoreButton, false);
     }
+  });
+}
+
+function bindExampleButtons(countyInput, yearInput) {
+  const exampleButtons = document.querySelectorAll(".example-button");
+  if (!exampleButtons.length) {
+    return;
+  }
+
+  exampleButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      countyInput.value = button.dataset.exampleFips || "";
+      yearInput.value = button.dataset.exampleYear || "";
+      countyInput.focus();
+    });
   });
 }
 
@@ -148,28 +164,43 @@ function hideError(errorCard) {
 }
 
 function renderScoreResult(payload) {
+  const percentilePrimaryElement = document.getElementById("metric-risk-percentile-primary");
+  const percentileExplainerElement = document.getElementById("metric-percentile-explainer");
   const riskScoreElement = document.getElementById("metric-risk-score");
-  const percentileElement = document.getElementById("metric-risk-percentile");
-  const asOfYearAvailableElement = document.getElementById("metric-year-available");
-  const minYearElement = document.getElementById("metric-years-min");
-  const maxYearElement = document.getElementById("metric-years-max");
+  const yearUsedElement = document.getElementById("metric-year-used");
+  const yearNoteElement = document.getElementById("metric-year-note");
   const metaElement = document.getElementById("result-meta");
+  const rawFieldsElement = document.getElementById("raw-fields-json");
   const featuresElement = document.getElementById("features-json");
   const notesElement = document.getElementById("notes-callout");
 
+  const percentileValue = Number(payload.risk_percentile_in_year);
+  const asOfYear = formatInteger(payload.as_of_year);
+  const percentileText = formatPercentile(percentileValue);
+
+  percentilePrimaryElement.textContent = percentileText;
+  percentileExplainerElement.textContent = buildPercentileExplainer(percentileValue, asOfYear);
   riskScoreElement.textContent = formatNumber(payload.risk_score, 3);
-  percentileElement.textContent = formatNumber(payload.risk_percentile_in_year, 1);
-  asOfYearAvailableElement.textContent = formatBoolean(payload.as_of_year_available);
-  minYearElement.textContent = formatInteger(payload.available_years_min);
-  maxYearElement.textContent = formatInteger(payload.available_years_max);
+  yearUsedElement.textContent = asOfYear;
+  yearNoteElement.textContent = "Leave year blank to use the latest available year for that county.";
 
-  metaElement.textContent = [
-    `county_fips ${payload.county_fips}`,
-    `as_of_year ${formatInteger(payload.as_of_year)}`,
-    payload.model_type || "unknown_model_type",
-    payload.model_version || "unknown_model_version",
-  ].join(" • ");
+  metaElement.textContent = [`County ${payload.county_fips}`, `Compared within ${asOfYear}`].join(" • ");
 
+  // Keep raw API fields in Details so the default view stays non-technical.
+  const rawFields = {
+    county_fips: payload.county_fips,
+    as_of_year: payload.as_of_year,
+    as_of_year_available: payload.as_of_year_available,
+    available_years_min: payload.available_years_min,
+    available_years_max: payload.available_years_max,
+    risk_percentile_in_year: payload.risk_percentile_in_year,
+    risk_score: payload.risk_score,
+    model_version: payload.model_version,
+    model_type: payload.model_type,
+    notes: payload.notes,
+  };
+
+  rawFieldsElement.textContent = JSON.stringify(rawFields, null, 2);
   featuresElement.textContent = JSON.stringify(payload.features_used || {}, null, 2);
 
   if (payload.notes && String(payload.notes).trim() !== "") {
@@ -179,6 +210,20 @@ function renderScoreResult(payload) {
     notesElement.textContent = "";
     notesElement.classList.add("hidden");
   }
+}
+
+function buildPercentileExplainer(percentileValue, asOfYearText) {
+  if (Number.isNaN(percentileValue)) {
+    return "Percentile could not be computed for this response.";
+  }
+  return `This is higher than about ${percentileValue.toFixed(1)}% of counties scored for ${asOfYearText}.`;
+}
+
+function formatPercentile(percentileValue) {
+  if (Number.isNaN(percentileValue)) {
+    return "-";
+  }
+  return `${percentileValue.toFixed(1)} percentile`;
 }
 
 function formatNumber(value, digits) {
@@ -195,14 +240,4 @@ function formatInteger(value) {
     return "-";
   }
   return String(Math.trunc(numberValue));
-}
-
-function formatBoolean(value) {
-  if (value === true) {
-    return "true";
-  }
-  if (value === false) {
-    return "false";
-  }
-  return "-";
 }

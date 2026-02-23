@@ -30,10 +30,17 @@
       <section class="hero card">
         <p class="eyebrow">Eviction Lab Yearly Risk API</p>
         <h1>Score one county and interpret the result in seconds.</h1>
-        <p class="subtitle">
-          Enter a county FIPS and optional year. If year is blank, the API scores the latest available year for that
-          county.
-        </p>
+        <p class="subtitle">Use this demo to understand county-level relative risk, not to make high-stakes decisions.</p>
+      </section>
+
+      <section class="card prose">
+        <h2>What this predicts</h2>
+        <ul>
+          <li>Predicts whether a county will be in the highest-risk 25% for eviction filing rate next year.</li>
+          <li>92nd percentile means higher risk than about 92% of counties for that year.</li>
+          <li>Leave blank to use the latest available year for that county.</li>
+        </ul>
+        <p class="small-disclaimer">Historical demo (outcomes through 2018). Not for high-stakes decisions.</p>
       </section>
 
       <section class="card">
@@ -51,7 +58,19 @@
           </div>
           <div class="form-actions">
             <button id="score-button" type="submit">Score</button>
-            <p class="helper">Try <code>39049</code> with year <code>2015</code>.</p>
+            <p class="helper">Enter a 5-digit county FIPS and optional 4-digit year.</p>
+          </div>
+          <div class="quick-examples" aria-label="Try an example">
+            <p class="helper">Try an example:</p>
+            <button type="button" class="example-button" data-example-fips="39049" data-example-year="2015">
+              39049 with 2015
+            </button>
+            <button type="button" class="example-button" data-example-fips="39049">
+              39049 latest year
+            </button>
+            <button type="button" class="example-button" data-example-fips="06037">
+              06037 latest year
+            </button>
           </div>
         </form>
       </section>
@@ -68,32 +87,32 @@
           <p id="result-meta" class="muted"></p>
         </div>
 
-        <div class="metrics-grid">
+        <p class="target-line">Prediction target: top-quartile next-year filing rate.</p>
+
+        <div class="primary-metric">
+          <p class="metric-label">Risk percentile</p>
+          <p id="metric-risk-percentile-primary" class="primary-metric-value">-</p>
+          <p id="metric-percentile-explainer" class="metric-copy">-</p>
+        </div>
+
+        <div class="secondary-grid">
           <article class="metric">
-            <p class="metric-label">risk_score</p>
+            <p class="metric-label">Model score (0–1)</p>
             <p id="metric-risk-score" class="metric-value">-</p>
+            <p class="metric-copy">Higher values indicate stronger model confidence in higher relative risk.</p>
           </article>
           <article class="metric">
-            <p class="metric-label">risk_percentile_in_year</p>
-            <p id="metric-risk-percentile" class="metric-value">-</p>
-          </article>
-          <article class="metric">
-            <p class="metric-label">as_of_year_available</p>
-            <p id="metric-year-available" class="metric-value">-</p>
-          </article>
-          <article class="metric">
-            <p class="metric-label">available_years_min</p>
-            <p id="metric-years-min" class="metric-value">-</p>
-          </article>
-          <article class="metric">
-            <p class="metric-label">available_years_max</p>
-            <p id="metric-years-max" class="metric-value">-</p>
+            <p class="metric-label">Year used for scoring</p>
+            <p id="metric-year-used" class="metric-value">-</p>
+            <p id="metric-year-note" class="metric-copy">-</p>
           </article>
         </div>
 
         <details class="details-panel">
-          <summary>Details</summary>
+          <summary>Details (raw fields and features)</summary>
           <div class="details-body">
+            <h3>raw_fields</h3>
+            <pre id="raw-fields-json" class="code-block">{}</pre>
             <h3>features_used</h3>
             <pre id="features-json" class="code-block">{}</pre>
             <div id="notes-callout" class="note-callout hidden"></div>

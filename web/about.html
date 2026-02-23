@@ -28,19 +28,27 @@
 
     <main class="container">
       <section class="hero card">
-        <p class="eyebrow">Model Summary</p>
-        <h1>What this demo predicts and what it does not.</h1>
-        <p class="subtitle">This page explains the label, features, data source, and practical limitations.</p>
+        <p class="eyebrow">About This Demo</p>
+        <h1>A quick county-level risk signal, explained in plain language.</h1>
+        <p class="subtitle">
+          This demo estimates which counties may rank toward the high end of eviction filing risk in the next year,
+          relative to other counties.
+        </p>
       </section>
 
       <section class="card prose">
-        <h2>Label</h2>
+        <h2>How to read this</h2>
         <p>
-          The model predicts whether a county will land in the next year&rsquo;s top quartile of
-          <code>filing_rate</code>.
+          Think of this tool as a relative ranking. A county at the 90th percentile is estimated to have higher
+          eviction filing risk than about 90% of counties in that same year.
+        </p>
+        <p>
+          The prediction target is whether a county will land in the highest-risk 25% for next year&rsquo;s eviction
+          filing rate.
         </p>
 
-        <h2>Features</h2>
+        <h2>What data patterns are used</h2>
+        <p>The score uses county-level historical patterns:</p>
         <ul>
           <li><code>lag_1</code></li>
           <li><code>lag_3_mean_obs</code></li>
@@ -48,10 +56,10 @@
           <li><code>years_since_last_obs</code></li>
         </ul>
 
-        <h2>Data Source</h2>
+        <h2>Data source</h2>
         <p>
-          Princeton Eviction Lab county-level observed/validated data, sourced from
-          <code>county_proprietary_valid_2000_2018.csv</code>.
+          Princeton Eviction Lab county-level observed/validated dataset
+          (<code>county_proprietary_valid_2000_2018.csv</code>).
         </p>
 
         <h2>Limitations</h2>
@@ -62,6 +70,24 @@
           <li>Scores reflect historical correlations, not guarantees.</li>
           <li>Do not use this demo for high-stakes decisions.</li>
         </ul>
+
+        <details class="details-panel">
+          <summary>Technical details</summary>
+          <div class="details-body">
+            <p>
+              The model is logistic regression. In plain terms, it combines the feature inputs into a weighted sum and
+              converts that value through a sigmoid curve to output a probability-like score between 0 and 1.
+            </p>
+            <p>
+              Regularization (C=0.1) helps avoid overreacting to noisy patterns, and calibration settings are included
+              as guardrails to keep probability-like outputs more stable.
+            </p>
+            <p>
+              Training data comes from the Princeton Eviction Lab county-level series, with outcomes available through
+              2018.
+            </p>
+          </div>
+        </details>
       </section>
     </main>
   </body>
