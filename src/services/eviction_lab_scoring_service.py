@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
@@ -288,12 +288,122 @@ class EvictionLabScoringService:
             "limitations": metadata["limitations"],
         }
 
-    def score_county(self, county_fips: str, as_of_year: int) -> Dict[str, Any]:
+    def _get_county_feature_rows(
+        self,
+        feature_df: pd.DataFrame,
+        county_fips: str,
+    ) -> pd.DataFrame:
+        """Return all feature rows for one county.
+
+        Args:
+            feature_df: Full processed feature table.
+            county_fips: Normalized 5-digit county code.
+
+        Returns:
+            DataFrame of rows for this county.
+
+        Raises:
+            ScoringServiceError: If county does not exist in the feature table.
+        """
+        county_df = feature_df[feature_df["county_fips"] == county_fips].copy()
+        if county_df.empty:
+            raise ScoringServiceError(
+                f"Unknown county_fips '{county_fips}'.",
+                404,
+                details={
+                    "county_fips": county_fips,
+                    "as_of_year_available": False,
+                    "available_years_min": None,
+                    "available_years_max": None,
+                },
+            )
+        return county_df
+
+    def _get_scoreable_county_feature_rows(self, county_df: pd.DataFrame) -> pd.DataFrame:
+        """Return county rows that have complete model features."""
+        scoreable_df = county_df.dropna(subset=MODEL_FEATURE_COLUMNS).copy()
+        if scoreable_df.empty:
+            county_fips = str(county_df["county_fips"].iloc[0])
+            raise ScoringServiceError(
+                (
+                    f"County '{county_fips}' exists but has no scoreable years in the "
+                    "processed feature table."
+                ),
+                422,
+                details={
+                    "county_fips": county_fips,
+                    "as_of_year_available": False,
+                    "available_years_min": None,
+                    "available_years_max": None,
+                },
+            )
+        return scoreable_df
+
+    def _get_available_year_bounds(
+        self,
+        county_scoreable_df: pd.DataFrame,
+    ) -> Tuple[int, int]:
+        """Get min and max available scoreable years for one county."""
+        min_year = int(county_scoreable_df["year"].min())
+        max_year = int(county_scoreable_df["year"].max())
+        return min_year, max_year
+
+    def _resolve_as_of_year(
+        self,
+        county_fips: str,
+        requested_as_of_year: Optional[int],
+        available_years: list[int],
+    ) -> Tuple[int, Optional[str]]:
+        """Resolve the feature year to use for scoring.
+
+        Args:
+            county_fips: Normalized county code used in responses.
+            requested_as_of_year: User-supplied year, if provided.
+            available_years: Sorted scoreable years for this county.
+
+        Returns:
+            Tuple of (resolved_year, optional_note).
+
+        Raises:
+            ScoringServiceError: If a requested year is not scoreable.
+        """
+        min_year = int(available_years[0])
+        max_year = int(available_years[-1])
+
+        if requested_as_of_year is None:
+            return max_year, (
+                f"as_of_year was not provided. Used latest available year ({max_year})."
+            )
+
+        if requested_as_of_year in set(available_years):
+            return int(requested_as_of_year), None
+
+        raise ScoringServiceError(
+            (
+                "as_of_year is not available for this county. "
+                "This API returns an error when an unavailable as_of_year is provided. "
+                f"Try a year in [{min_year}, {max_year}]."
+            ),
+            400,
+            details={
+                "county_fips": county_fips,
+                "as_of_year": int(requested_as_of_year),
+                "as_of_year_available": False,
+                "available_years_min": min_year,
+                "available_years_max": max_year,
+            },
+        )
+
+    def score_county(
+        self,
+        county_fips: str,
+        as_of_year: Optional[int],
+    ) -> Dict[str, Any]:
         """Score one county-year request using model and processed feature table.
 
         Args:
             county_fips: County FIPS code input.
-            as_of_year: Year of feature row to score.
+            as_of_year: Year of feature row to score. If None, latest is used.
 
         Returns:
             API-ready score response dictionary.
@@ -302,71 +412,39 @@ class EvictionLabScoringService:
         feature_df = self._load_feature_table()
 
         normalized_fips = _normalize_county_fips(county_fips)
+        county_df = self._get_county_feature_rows(feature_df, normalized_fips)
+        county_scoreable_df = self._get_scoreable_county_feature_rows(county_df)
+        available_years = sorted(county_scoreable_df["year"].unique().tolist())
+        available_years_min, available_years_max = self._get_available_year_bounds(
+            county_scoreable_df
+        )
+        resolved_as_of_year, note = self._resolve_as_of_year(
+            county_fips=normalized_fips,
+            requested_as_of_year=as_of_year,
+            available_years=available_years,
+        )
 
-        county_df = feature_df[feature_df["county_fips"] == normalized_fips].copy()
-        available_years_min: Optional[int] = None
-        available_years_max: Optional[int] = None
-
-        if not county_df.empty:
-            available_years_min = int(county_df["year"].min())
-            available_years_max = int(county_df["year"].max())
-
-        as_of_year_available = bool((county_df["year"] == as_of_year).any())
-        if not as_of_year_available:
-            if county_df.empty:
-                message = (
-                    "No rows found for county_fips in processed feature data. "
-                    "Try a county/year present in the feature table."
-                )
-            else:
-                county_years = sorted(county_df["year"].unique().tolist())
-                message = (
-                    "as_of_year is not available for this county. "
-                    f"Try one of the available years: {county_years}."
-                )
-
-            raise ScoringServiceError(
-                message=message,
-                status_code=400,
-                details={
-                    "county_fips": normalized_fips,
-                    "as_of_year": int(as_of_year),
-                    "as_of_year_available": False,
-                    "available_years_min": available_years_min,
-                    "available_years_max": available_years_max,
-                },
-            )
-
-        county_year_df = county_df[county_df["year"] == as_of_year].copy()
+        county_year_df = county_scoreable_df[
+            county_scoreable_df["year"] == resolved_as_of_year
+        ].copy()
         if county_year_df.empty:
             raise ScoringServiceError(
-                "No scoreable row found for the requested county_fips and as_of_year.",
+                "Requested county-year is not scoreable in the processed feature table.",
                 400,
                 details={
                     "county_fips": normalized_fips,
-                    "as_of_year": int(as_of_year),
+                    "as_of_year": int(resolved_as_of_year),
                     "as_of_year_available": False,
                     "available_years_min": available_years_min,
                     "available_years_max": available_years_max,
                 },
             )
 
-        if county_year_df[MODEL_FEATURE_COLUMNS].isna().any(axis=None):
-            raise ScoringServiceError(
-                "Requested county-year row has missing model features and cannot be scored.",
-                400,
-                details={
-                    "county_fips": normalized_fips,
-                    "as_of_year": int(as_of_year),
-                    "as_of_year_available": True,
-                    "available_years_min": available_years_min,
-                    "available_years_max": available_years_max,
-                },
-            )
+        risk_score = float(
+            model.predict_proba(county_year_df[MODEL_FEATURE_COLUMNS])[:, 1][0]
+        )
 
-        risk_score = float(model.predict_proba(county_year_df[MODEL_FEATURE_COLUMNS])[:, 1][0])
-
-        year_scores = self._get_year_score_distribution(as_of_year)
+        year_scores = self._get_year_score_distribution(resolved_as_of_year)
         risk_percentile = float((year_scores <= risk_score).mean() * 100.0)
 
         feature_row = county_year_df.iloc[0]
@@ -381,7 +459,7 @@ class EvictionLabScoringService:
 
         return {
             "county_fips": normalized_fips,
-            "as_of_year": int(as_of_year),
+            "as_of_year": int(resolved_as_of_year),
             "risk_score": risk_score,
             "model_version": str(metadata.get("model_version", "unknown")),
             "model_type": str(metadata.get("model_type", MODEL_TYPE)),
@@ -390,7 +468,7 @@ class EvictionLabScoringService:
             "available_years_max": available_years_max,
             "risk_percentile_in_year": risk_percentile,
             "features_used": features_used,
-            "notes": None,
+            "notes": note,
         }
 
 

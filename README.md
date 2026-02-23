@@ -40,6 +40,24 @@ Interactive docs:
 - `risk_percentile_in_year`: percentile rank (0-100) among scoreable counties in that year.
 - `as_of_year_available`, `available_years_min`, `available_years_max`: availability context for requested year/county.
 
+`/score` request behavior:
+- `as_of_year` is optional. If omitted, the API uses the latest available scoreable year for that county.
+- Unknown county FIPS returns `404`.
+- Counties with no scoreable years return `422`.
+- If `as_of_year` is provided but unavailable for that county, the API returns `400` with available min/max years.
+
+Manual API checks:
+
+```bash
+curl -X POST http://127.0.0.1:8000/score \
+  -H "Content-Type: application/json" \
+  -d '{"county_fips":"39049"}'
+
+curl -X POST http://127.0.0.1:8000/score \
+  -H "Content-Type: application/json" \
+  -d '{"county_fips":"39049","as_of_year":2015}'
+```
+
 ## Environment variables
 
 - `PORT`: API server port for `serve_api` (default `8000`).

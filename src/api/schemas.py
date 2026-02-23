@@ -27,16 +27,17 @@ class ScoreRequest(BaseModel):
     """Request schema for county-level risk scoring."""
 
     county_fips: str = Field(..., description="County FIPS code.")
-    as_of_year: int = Field(
-        ...,
+    as_of_year: Optional[int] = Field(
+        default=None,
         ge=2000,
         le=2100,
-        description="Feature year to score.",
+        description="Feature year to score. If omitted, latest available year is used.",
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
+                {"county_fips": "39049"},
                 {"county_fips": "39049", "as_of_year": 2017},
                 {"county_fips": "039049", "as_of_year": 2017},
             ]

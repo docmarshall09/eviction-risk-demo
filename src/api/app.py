@@ -57,7 +57,7 @@ def create_app() -> FastAPI:
 
     @app.post("/score", response_model=ScoreResponse)
     def score(request: ScoreRequest) -> ScoreResponse:
-        """Score one county for one as_of_year."""
+        """Score one county for one year, defaulting to latest when omitted."""
         service = get_scoring_service()
 
         try:
