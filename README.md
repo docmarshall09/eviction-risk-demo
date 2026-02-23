@@ -22,6 +22,24 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## API (local)
+
+Run the API server from your virtual environment:
+
+```bash
+source .venv/bin/activate
+python -m src.main --task serve_api
+```
+
+Interactive docs:
+- `http://127.0.0.1:8000/docs`
+- `http://127.0.0.1:8000/redoc`
+
+## Environment variables
+
+- `PORT`: API server port for `serve_api` (default `8000`).
+- `API_CORS_ORIGINS`: Comma-separated allowlist for CORS origins. Leave unset for no CORS.
+
 ## Monthly pipeline tasks
 
 Train monthly model and write artifacts:

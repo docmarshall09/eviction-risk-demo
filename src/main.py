@@ -1,9 +1,12 @@
 """CLI entry point for monthly and yearly eviction-risk model workflows."""
 
 import argparse
+from datetime import datetime, timezone
 import json
 import logging
+import os
 from pathlib import Path
+import subprocess
 
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -16,6 +19,7 @@ from src.config import (
     EVICTION_LAB_HOLDOUT_DETAIL_LAST_YEAR_PATH,
     EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH,
     EVICTION_LAB_YEARLY_LATEST_SCORES_PATH,
+    EVICTION_LAB_YEARLY_MODEL_METADATA_PATH,
     EVICTION_LAB_YEARLY_METRICS_PATH,
     EVICTION_LAB_YEARLY_MODEL_PATH,
     FEATURE_TABLE_PATH,
@@ -68,6 +72,7 @@ VALID_TASKS = [
     "score_eviction_lab_county",
     "backtest_eviction_lab_yearly",
     "train_eviction_lab_yearly_final",
+    "serve_api",
 ]
 
 
@@ -175,9 +180,15 @@ def _load_or_build_yearly_feature_table() -> pd.DataFrame:
             return _standardize_yearly_feature_df(feature_df)
 
         LOGGER.info(
-            "Yearly feature table at %s is outdated. Rebuilding with outcome_year.",
+            "Yearly feature table at %s is missing outcome_year. "
+            "Adding compatibility column from feature year.",
             EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH,
         )
+        feature_df["outcome_year"] = pd.to_numeric(
+            feature_df["year"], errors="coerce"
+        ) + 1
+        feature_df.to_csv(EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH, index=False)
+        return _standardize_yearly_feature_df(feature_df)
 
     LOGGER.info(
         "Yearly feature table not found at %s. Rebuilding from raw data.",
@@ -193,6 +204,106 @@ def _write_json_report(report_path: Path, payload: dict) -> None:
     """Write a JSON payload to a report path with UTF-8 encoding."""
     with report_path.open("w", encoding="utf-8") as report_file:
         json.dump(payload, report_file, indent=2)
+
+
+def _read_json_report_if_exists(report_path: Path) -> dict | None:
+    """Read a JSON report if present, otherwise return None."""
+    if not report_path.exists():
+        return None
+
+    with report_path.open("r", encoding="utf-8") as report_file:
+        return json.load(report_file)
+
+
+def _get_git_short_hash() -> str | None:
+    """Return the current git short hash, or None when unavailable."""
+    try:
+        command = ["git", "rev-parse", "--short", "HEAD"]
+        output = subprocess.check_output(command, cwd=Path(__file__).resolve().parent.parent)
+        git_hash = output.decode("utf-8").strip()
+        if git_hash == "":
+            return None
+        return git_hash
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def _build_model_version() -> str:
+    """Build model version string from UTC timestamp and optional git hash."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    git_hash = _get_git_short_hash()
+    if git_hash is None:
+        return timestamp
+    return f"{timestamp}_{git_hash}"
+
+
+def _summarize_metrics_for_metadata(metrics_payload: dict | None) -> dict | None:
+    """Create a compact metrics summary for metadata artifacts."""
+    if metrics_payload is None:
+        return None
+
+    summary_keys = [
+        "auc",
+        "precision_at_0_5",
+        "recall_at_0_5",
+        "test_rows",
+        "test_year_start",
+        "test_year_end",
+    ]
+
+    summary: dict = {}
+    for key in summary_keys:
+        if key in metrics_payload:
+            summary[key] = metrics_payload[key]
+
+    if "overall" in metrics_payload:
+        summary["overall"] = metrics_payload["overall"]
+
+    if not summary:
+        return None
+    return summary
+
+
+def _build_yearly_model_metadata_payload(
+    training_df: pd.DataFrame,
+    metrics_payload: dict | None,
+) -> dict:
+    """Build yearly model metadata payload for API docs and scoring responses."""
+    model_version = _build_model_version()
+    training_feature_years = training_df["year"]
+    outcome_years = training_df["outcome_year"]
+
+    return {
+        "model_version": model_version,
+        "model_type": "eviction_lab_yearly_logreg",
+        "trained_on_dataset_name": "county_proprietary_valid_2000_2018.csv",
+        "training_feature_year_range": {
+            "min_year": int(training_feature_years.min()),
+            "max_year": int(training_feature_years.max()),
+        },
+        "training_years": {
+            "min_year": int(training_feature_years.min()),
+            "max_year": int(training_feature_years.max()),
+        },
+        "outcome_year_range": {
+            "min_year": int(outcome_years.min()),
+            "max_year": int(outcome_years.max()),
+        },
+        "label_definition": "Top-quartile filing_rate in year t+1 across counties.",
+        "feature_list": MODEL_FEATURE_COLUMNS,
+        "metrics_summary": _summarize_metrics_for_metadata(metrics_payload),
+        "limitations": [
+            "Dataset ends at 2018 outcome year.",
+            "Irregular county-year panel without gap filling.",
+            "Scores depend on available county-year feature rows.",
+        ],
+    }
+
+
+def _write_yearly_model_metadata(training_df: pd.DataFrame, metrics_payload: dict | None) -> None:
+    """Write yearly model metadata artifact used by API metadata endpoint."""
+    metadata_payload = _build_yearly_model_metadata_payload(training_df, metrics_payload)
+    _write_json_report(EVICTION_LAB_YEARLY_MODEL_METADATA_PATH, metadata_payload)
 
 
 def run_train_eviction_model() -> None:
@@ -238,9 +349,14 @@ def run_train_eviction_lab_yearly() -> None:
 
     save_eviction_lab_yearly_model(model, str(EVICTION_LAB_YEARLY_MODEL_PATH))
     _write_json_report(EVICTION_LAB_YEARLY_METRICS_PATH, metrics)
+    _write_yearly_model_metadata(training_df=train_df, metrics_payload=metrics)
 
     LOGGER.info("Saved yearly model to %s", EVICTION_LAB_YEARLY_MODEL_PATH)
     LOGGER.info("Saved yearly metrics to %s", EVICTION_LAB_YEARLY_METRICS_PATH)
+    LOGGER.info(
+        "Saved yearly model metadata to %s",
+        EVICTION_LAB_YEARLY_MODEL_METADATA_PATH,
+    )
 
 
 def _run_outcome_year_backtest(
@@ -309,9 +425,31 @@ def run_train_eviction_lab_yearly_final() -> None:
 
     model = train_eviction_lab_yearly_model(labeled_df)
     save_eviction_lab_yearly_model(model, str(EVICTION_LAB_YEARLY_MODEL_PATH))
+    prior_metrics = _read_json_report_if_exists(EVICTION_LAB_YEARLY_METRICS_PATH)
+    _write_yearly_model_metadata(training_df=labeled_df, metrics_payload=prior_metrics)
 
     LOGGER.info("Trained final yearly model on %d labeled rows.", len(labeled_df))
     LOGGER.info("Saved final yearly model to %s", EVICTION_LAB_YEARLY_MODEL_PATH)
+    LOGGER.info(
+        "Saved yearly model metadata to %s",
+        EVICTION_LAB_YEARLY_MODEL_METADATA_PATH,
+    )
+
+
+def run_serve_api() -> None:
+    """Run the FastAPI app with uvicorn for local development."""
+    port_text = os.getenv("PORT", "8000").strip()
+    if not port_text.isdigit():
+        raise ValueError("PORT must be an integer value.")
+
+    port = int(port_text)
+    if port <= 0 or port > 65535:
+        raise ValueError("PORT must be between 1 and 65535.")
+
+    import uvicorn
+
+    LOGGER.info("Starting API server on http://127.0.0.1:%d", port)
+    uvicorn.run("src.api.app:app", host="127.0.0.1", port=port)
 
 
 def _load_monthly_model_or_raise(model_path: Path) -> Pipeline:
@@ -496,6 +634,10 @@ def main() -> None:
 
         if args.task == "train_eviction_lab_yearly_final":
             run_train_eviction_lab_yearly_final()
+            return
+
+        if args.task == "serve_api":
+            run_serve_api()
             return
 
     except FileNotFoundError as error:

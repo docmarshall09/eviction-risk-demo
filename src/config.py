@@ -20,6 +20,9 @@ EVICTION_LAB_YEARLY_FEATURE_TABLE_PATH: Path = (
     PROCESSED_DIR / "eviction_lab_yearly_features.csv"
 )
 EVICTION_LAB_YEARLY_MODEL_PATH: Path = MODELS_DIR / "eviction_lab_yearly_model.joblib"
+EVICTION_LAB_YEARLY_MODEL_METADATA_PATH: Path = (
+    MODELS_DIR / "eviction_lab_yearly_model_metadata.json"
+)
 EVICTION_LAB_YEARLY_METRICS_PATH: Path = (
     REPORTS_DIR / "eviction_lab_yearly_model_metrics.json"
 )
