@@ -4,6 +4,7 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api.schemas import MetadataResponse, ScoreRequest, ScoreResponse
@@ -41,6 +42,12 @@ def create_app() -> FastAPI:
         )
 
     app.mount("/demo", StaticFiles(directory="web", html=True), name="demo")
+
+    @app.get("/")
+    def root() -> RedirectResponse:
+        """Redirect root requests to the static demo site."""
+        # Keep the default temporary redirect behavior.
+        return RedirectResponse(url="/demo/")
 
     @app.get("/health")
     def health() -> dict[str, str]:
