@@ -29,67 +29,120 @@
 
     <main class="container">
       <section class="hero card">
-        <p class="eyebrow">About This Demo</p>
-        <h1>A quick county-level risk signal, explained in plain language.</h1>
+        <p class="eyebrow">Product Explainer</p>
+        <h1>How this demo works</h1>
         <p class="subtitle">
-          This demo estimates which counties may rank toward the high end of eviction filing risk in the next year,
-          relative to other counties.
+          Predicts whether a county will be in the highest-risk 25% for eviction filing rate next year. Historical
+          demo using county data with outcomes through 2018.
         </p>
-        <p class="subtitle"><a href="/demo/analysis.html">See the analysis (charts + backtests).</a></p>
+        <p class="subtitle">
+          <a class="cta-link" href="/demo/analysis.html">See the analysis (charts + backtests)</a>
+        </p>
       </section>
 
       <section class="card prose">
-        <h2>How to read this</h2>
-        <p>
-          Think of this tool as a relative ranking. A county at the 90th percentile is estimated to have higher
-          eviction filing risk than about 90% of counties in that same year.
-        </p>
-        <p>
-          The prediction target is whether a county will land in the highest-risk 25% for next year&rsquo;s eviction
-          filing rate.
-        </p>
-
-        <h2>What data patterns are used</h2>
-        <p>The score uses county-level historical patterns:</p>
+        <h2>The question we answer</h2>
         <ul>
-          <li><code>lag_1</code></li>
-          <li><code>lag_3_mean_obs</code></li>
-          <li><code>lag_5_mean_obs</code></li>
-          <li><code>years_since_last_obs</code></li>
+          <li>Input: recent county filing-rate history and simple trend summaries.</li>
+          <li>Output: the chance a county lands in next year&rsquo;s top-risk quartile.</li>
+          <li>Percentile interpretation: 92nd percentile means higher risk than about 92% of counties in that year.</li>
+          <li>If you leave year blank, the API uses the latest available year for that county.</li>
         </ul>
+      </section>
 
-        <h2>Data source</h2>
+      <section class="card">
+        <h2>How it works</h2>
+        <div class="pipeline-grid">
+          <article class="pipeline-step">
+            <p class="step-badge">1</p>
+            <h3>Build features from recent history</h3>
+            <p>We summarize recent filing-rate behavior into a few stable county-level inputs.</p>
+          </article>
+          <article class="pipeline-step">
+            <p class="step-badge">2</p>
+            <h3>Weighted linear score (log-odds)</h3>
+            <p>The model combines those inputs with learned weights to create a single risk signal.</p>
+          </article>
+          <article class="pipeline-step">
+            <p class="step-badge">3</p>
+            <h3>Sigmoid converts to probability (0–1)</h3>
+            <p>That signal is mapped to a probability-like score that is easy to compare across counties.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="card prose">
+        <h2>What we learned</h2>
         <p>
-          Princeton Eviction Lab county-level observed/validated dataset
-          (<code>county_proprietary_valid_2000_2018.csv</code>).
+          Eviction filing rates appear persistent from year to year. In backtests, the full model performs strongly,
+          while a naive baseline using only <code>lag_1</code> is still close. That implies recent history carries a
+          lot of signal, and the richer feature set adds incremental value.
         </p>
+        <a class="cta-link" href="/demo/analysis.html">See the analysis (charts + backtests)</a>
+      </section>
 
-        <h2>Limitations</h2>
+      <section class="card">
+        <h2>What goes into the model</h2>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3><code>lag_1</code></h3>
+            <p>Most recent observed filing rate for the county.</p>
+          </article>
+          <article class="feature-card">
+            <h3><code>lag_3_mean_obs</code></h3>
+            <p>Average filing rate across the three most recent observed years.</p>
+          </article>
+          <article class="feature-card">
+            <h3><code>lag_5_mean_obs</code></h3>
+            <p>Average filing rate across five observed years for a longer trend view.</p>
+          </article>
+          <article class="feature-card">
+            <h3><code>years_since_last_obs</code></h3>
+            <p>How long since the county&rsquo;s previous observation in the irregular panel.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="card prose">
+        <h2>Limitations and responsible use</h2>
         <ul>
-          <li>Outcomes end at the 2018 outcome-year.</li>
-          <li>Predictions are county-level only.</li>
-          <li>This is a demo and not a causal model.</li>
-          <li>Scores reflect historical correlations, not guarantees.</li>
-          <li>Do not use this demo for high-stakes decisions.</li>
+          <li>Outcomes in this dataset run through 2018.</li>
+          <li>Predictions are county-level only, not neighborhood or household level.</li>
+          <li>This is not a causal model and should not be read as cause-and-effect.</li>
+          <li>Demo only. Do not use for high-stakes decisions.</li>
         </ul>
+      </section>
 
+      <section class="card prose">
         <details class="details-panel">
           <summary>Technical details</summary>
           <div class="details-body">
             <p>
-              The model is logistic regression. In plain terms, it combines the feature inputs into a weighted sum and
-              converts that value through a sigmoid curve to output a probability-like score between 0 and 1.
+              Logistic regression models the log-odds of the outcome as a weighted sum of features, then converts that
+              value to a probability with the sigmoid function.
             </p>
             <p>
-              Regularization (C=0.1) helps avoid overreacting to noisy patterns, and calibration settings are included
-              as guardrails to keep probability-like outputs more stable.
+              Readable formula: <code>logit = b0 + b1*lag_1 + b2*lag_3_mean_obs + b3*lag_5_mean_obs + b4*years_since_last_obs</code>,
+              then <code>p = 1 / (1 + exp(-logit))</code>.
             </p>
             <p>
-              Training data comes from the Princeton Eviction Lab county-level series, with outcomes available through
-              2018.
+              We use regularization (<code>C=0.1</code>) to avoid unstable weights and calibration guardrails to avoid
+              overconfident probability saturation.
             </p>
           </div>
         </details>
+      </section>
+
+      <section class="card prose">
+        <h2>Learn more</h2>
+        <p class="link-row">
+          <a href="https://en.wikipedia.org/wiki/Logistic_regression" target="_blank" rel="noopener">
+            Logistic regression
+          </a>
+          <a href="https://en.wikipedia.org/wiki/Sigmoid_function" target="_blank" rel="noopener">Sigmoid function</a>
+          <a href="https://en.wikipedia.org/wiki/Logit" target="_blank" rel="noopener">Logit</a>
+          <a href="https://evictionlab.org/" target="_blank" rel="noopener">Princeton Eviction Lab</a>
+        </p>
       </section>
     </main>
   </body>
