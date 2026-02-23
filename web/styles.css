@@ -102,6 +102,18 @@ a:hover {
   border-color: rgba(47, 107, 255, 0.24);
 }
 
+.nav-links a.nav-external {
+  color: #1f3f7a;
+  border-color: #cfddff;
+  background: #eef3ff;
+}
+
+.nav-links a.nav-external:hover {
+  color: #173368;
+  border-color: #bfd2ff;
+  background: #e3ecff;
+}
+
 main.container {
   padding: 2rem 0 4rem;
 }
@@ -554,13 +566,15 @@ button:disabled {
   background: linear-gradient(180deg, #fbfdff 0%, #f4f8ff 100%);
   box-shadow: var(--shadow);
   padding: 0.85rem;
-  overflow-x: auto;
+  overflow: hidden;
+  max-width: 1360px;
+  margin: 0 auto;
 }
 
 .diagram-shell img {
   display: block;
   width: 100%;
-  min-width: 980px;
+  max-width: 100%;
   height: auto;
   border-radius: 10px;
   border: 1px solid #dbe6fd;

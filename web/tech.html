@@ -11,10 +11,6 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/demo/styles.css" />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/devicon.min.css"
-    />
     <script src="/demo/app.js" defer></script>
   </head>
   <body data-page="tech">
@@ -25,9 +21,15 @@
           <a data-nav="demo" href="/demo/">Demo</a>
           <a data-nav="about" href="/demo/about.html">About</a>
           <a data-nav="analysis" href="/demo/analysis.html">Analysis</a>
-          <a data-nav="api" href="/demo/api.html">API</a>
           <a data-nav="tech" href="/demo/tech.html">Tech</a>
-          <a href="/docs" target="_blank" rel="noopener">Swagger</a>
+          <a
+            class="nav-external"
+            href="https://github.com/docmarshall09/cosign-public-data-poc"
+            target="_blank"
+            rel="noopener"
+          >
+            GitHub
+          </a>
         </nav>
       </div>
     </header>
@@ -42,77 +44,18 @@
         </p>
       </section>
 
-      <section class="card">
-        <h2>Tech stack</h2>
-        <div class="logo-wall">
-          <article class="logo-tile">
-            <i class="devicon-python-plain colored" aria-hidden="true"></i>
-            <p>Python</p>
-          </article>
-          <article class="logo-tile">
-            <i class="devicon-fastapi-plain colored" aria-hidden="true"></i>
-            <p>FastAPI</p>
-          </article>
-          <article class="logo-tile">
-            <img
-              class="brand-logo"
-              src="https://cdn.simpleicons.org/uvicorn/499848"
-              alt="Uvicorn logo"
-              loading="lazy"
-              onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';"
-            />
-            <span class="brand-fallback" style="display: none">UV</span>
-            <p>Uvicorn</p>
-          </article>
-          <article class="logo-tile">
-            <i class="devicon-scikitlearn-plain colored" aria-hidden="true"></i>
-            <p>scikit-learn</p>
-          </article>
-          <article class="logo-tile">
-            <i class="devicon-pandas-plain colored" aria-hidden="true"></i>
-            <p>pandas</p>
-          </article>
-          <article class="logo-tile">
-            <i class="devicon-numpy-plain colored" aria-hidden="true"></i>
-            <p>NumPy</p>
-          </article>
-          <article class="logo-tile">
-            <i class="devicon-docker-plain colored" aria-hidden="true"></i>
-            <p>Docker</p>
-          </article>
-          <article class="logo-tile">
-            <img
-              class="brand-logo"
-              src="https://cdn.simpleicons.org/render/46E3B7"
-              alt="Render logo"
-              loading="lazy"
-              onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';"
-            />
-            <span class="brand-fallback" style="display: none">R</span>
-            <p>Render</p>
-          </article>
-          <article class="logo-tile">
-            <i class="devicon-github-original" aria-hidden="true"></i>
-            <p>GitHub</p>
-          </article>
-          <article class="logo-tile">
-            <div class="triple-stack-icons" aria-hidden="true">
-              <i class="devicon-html5-plain colored"></i>
-              <i class="devicon-css3-plain colored"></i>
-              <i class="devicon-javascript-plain colored"></i>
-            </div>
-            <p>HTML / CSS / JavaScript</p>
-          </article>
-        </div>
-        <p class="tech-footnote">Logos are trademarks of their respective owners.</p>
+      <section class="card prose">
+        <h2>Stack summary</h2>
+        <ul>
+          <li>FastAPI serves the API and the static demo UI.</li>
+          <li>Yearly logistic regression (scikit-learn) is trained at Docker build time.</li>
+          <li>Model artifacts are bundled into the runtime image for fast scoring.</li>
+          <li>Hosted on Render; deploy triggers on GitHub push.</li>
+        </ul>
       </section>
 
-      <section class="card">
+      <section class="card architecture-card">
         <h2>Architecture</h2>
-        <p class="subtitle">
-          End-to-end flow from Git push to deployed scoring requests. Build/deploy and runtime paths are separated for
-          clarity.
-        </p>
         <div class="diagram-shell">
           <img
             src="/demo/assets/tech_architecture.svg"
@@ -121,13 +64,28 @@
         </div>
       </section>
 
+      <section class="card repo-card">
+        <h2>GitHub repository</h2>
+        <p class="subtitle">Source code, deploy flow, and full project history.</p>
+        <p>
+          <a
+            class="cta-link"
+            href="https://github.com/docmarshall09/cosign-public-data-poc"
+            target="_blank"
+            rel="noopener"
+          >
+            Open repository
+          </a>
+        </p>
+      </section>
+
       <section class="card prose">
         <h2>API usage</h2>
         <p>
-          Base URL: <code>https://eviction-risk-demo.onrender.com</code> · Docs:
-          <a href="https://eviction-risk-demo.onrender.com/docs" target="_blank" rel="noopener">
-            https://eviction-risk-demo.onrender.com/docs
-          </a>
+          <a href="/docs" target="_blank" rel="noopener">Developer docs (Swagger)</a>
+        </p>
+        <p>
+          Base URL: <code>https://eviction-risk-demo.onrender.com</code>
         </p>
 
         <h3><code>GET /health</code></h3>
@@ -147,21 +105,6 @@
         <pre class="code-block"><code>curl -X POST https://eviction-risk-demo.onrender.com/score/batch \
   -H "Content-Type: application/json" \
   -d '[{"county_fips":"39049","as_of_year":2015},{"county_fips":"06037"}]'</code></pre>
-      </section>
-
-      <section class="card repo-card">
-        <h2>Source repository</h2>
-        <p class="subtitle">View code, training workflow, and deployment setup on GitHub.</p>
-        <p>
-          <a
-            class="cta-link"
-            href="https://github.com/docmarshall09/cosign-public-data-poc"
-            target="_blank"
-            rel="noopener"
-          >
-            Open GitHub repo
-          </a>
-        </p>
       </section>
     </main>
   </body>

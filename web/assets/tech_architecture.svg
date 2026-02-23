@@ -1,68 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1720 920" role="img" aria-labelledby="title desc">
-  <title id="title">Eviction risk demo architecture</title>
-  <desc id="desc">Two-lane architecture diagram showing build and deploy flow and runtime request flow.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1720 940" role="img" aria-labelledby="title desc">
+  <title id="title">Eviction risk demo architecture map</title>
+  <desc id="desc">Two-lane architecture showing build and deploy flow and runtime request flow.</desc>
   <defs>
-    <linearGradient id="canvasBg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f8faff" />
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f9fbff" />
       <stop offset="100%" stop-color="#eef3ff" />
     </linearGradient>
-    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#a8b8dd" flood-opacity="0.25" />
-    </filter>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L8,4 L0,8 z" fill="#56709f" />
+      <path d="M0,0 L8,4 L0,8 z" fill="#5f759f" />
     </marker>
     <style>
-      .lane-box {
-        fill: #f8fbff;
-        stroke: #c4d2ef;
-        stroke-width: 2.2;
-        stroke-dasharray: 8 8;
-        rx: 24;
+      .frame {
+        fill: url(#surface);
+        stroke: #d7e2f8;
+        stroke-width: 1.5;
       }
-      .node {
-        fill: #ffffff;
-        stroke: #cddaf3;
+      .lane-a {
+        fill: #f8fbff;
+        stroke: #c7d5f1;
         stroke-width: 2;
-        rx: 16;
-        filter: url(#cardShadow);
+        stroke-dasharray: 8 8;
+      }
+      .lane-b {
+        fill: #f6fbff;
+        stroke: #c5d9ef;
+        stroke-width: 2;
+        stroke-dasharray: 8 8;
       }
       .lane-title {
-        font: 700 23px Inter, Arial, sans-serif;
-        fill: #1b315b;
+        font: 700 24px Inter, Arial, sans-serif;
+        fill: #19325d;
       }
       .lane-sub {
         font: 500 14px Inter, Arial, sans-serif;
-        fill: #5a7098;
+        fill: #6178a1;
+      }
+      .node {
+        fill: #ffffff;
+        stroke: #cad9f3;
+        stroke-width: 2;
       }
       .node-title {
-        font: 650 16px Inter, Arial, sans-serif;
-        fill: #132748;
+        font: 640 18px Inter, Arial, sans-serif;
+        fill: #112646;
       }
       .node-sub {
         font: 500 13px Inter, Arial, sans-serif;
-        fill: #4b638d;
+        fill: #4f6893;
       }
       .arrow {
         fill: none;
-        stroke: #56709f;
+        stroke: #5f759f;
         stroke-width: 2.6;
         marker-end: url(#arrow);
       }
+      .icon-ring {
+        fill: #f2f6ff;
+        stroke: #bcd0f6;
+        stroke-width: 1.3;
+      }
       .chip {
         fill: #eef4ff;
-        stroke: #bfd0f4;
-        stroke-width: 1.4;
-        rx: 10;
+        stroke: #c3d3f6;
+        stroke-width: 1.2;
       }
       .chip-text {
-        font: 600 12.5px Inter, Arial, sans-serif;
-        fill: #355182;
-      }
-      .icon-bg {
-        fill: #f1f6ff;
-        stroke: #bcd0f6;
-        stroke-width: 1.2;
+        font: 600 12px Inter, Arial, sans-serif;
+        fill: #35527f;
       }
       .mini {
         font: 700 11px Inter, Arial, sans-serif;
@@ -70,106 +74,109 @@
     </style>
   </defs>
 
-  <rect x="8" y="8" width="1704" height="904" rx="28" fill="url(#canvasBg)" stroke="#d8e2f7" stroke-width="1.4" />
+  <rect class="frame" x="20" y="20" width="1680" height="900" rx="28" />
 
-  <rect class="lane-box" x="50" y="90" width="1620" height="330" />
-  <text class="lane-title" x="82" y="132">Lane A: Build &amp; Deploy (one-time per deploy)</text>
-  <text class="lane-sub" x="82" y="156">Triggered by Git push, runs Docker multi-stage build-time training, then ships runtime image.</text>
+  <!-- Lane A -->
+  <rect class="lane-a" x="60" y="110" width="1600" height="320" rx="24" />
+  <text class="lane-title" x="90" y="152">Lane A: Build &amp; Deploy (one-time per deploy)</text>
+  <text class="lane-sub" x="90" y="176">Git push triggers Render build, downloads CSV, trains model, packages runtime image, deploys.</text>
 
-  <rect class="lane-box" x="50" y="470" width="1620" height="330" />
-  <text class="lane-title" x="82" y="512">Lane B: Runtime (on every request)</text>
-  <text class="lane-sub" x="82" y="536">UI calls FastAPI endpoints, API loads deployed artifacts, returns score + percentile.</text>
+  <!-- Lane B -->
+  <rect class="lane-b" x="60" y="500" width="1600" height="320" rx="24" />
+  <text class="lane-title" x="90" y="542">Lane B: Runtime (on every request)</text>
+  <text class="lane-sub" x="90" y="566">UI calls FastAPI endpoints; API reads artifacts and returns risk score and percentile.</text>
 
-  <!-- Lane A nodes -->
-  <rect class="node" x="86" y="186" width="242" height="170" />
-  <circle class="icon-bg" cx="118" cy="222" r="17" />
-  <circle cx="118" cy="222" r="11" fill="#1f2937" />
-  <text x="118" y="226" text-anchor="middle" fill="#ffffff" class="mini">GH</text>
-  <text class="node-title" x="146" y="220">GitHub (push)</text>
-  <text class="node-sub" x="146" y="244">Source update triggers build</text>
+  <!-- Build lane nodes -->
+  <rect class="node" x="100" y="210" width="230" height="150" rx="16" />
+  <circle class="icon-ring" cx="136" cy="246" r="20" />
+  <circle cx="136" cy="246" r="12" fill="#111827" />
+  <circle cx="132" cy="243" r="1.4" fill="#ffffff" />
+  <circle cx="140" cy="243" r="1.4" fill="#ffffff" />
+  <text class="node-title" x="166" y="248">GitHub (push)</text>
+  <text class="node-sub" x="166" y="272">Source update</text>
 
-  <rect class="node" x="358" y="186" width="242" height="170" />
-  <circle class="icon-bg" cx="390" cy="222" r="17" />
-  <rect x="381" y="213" width="18" height="18" rx="4" fill="#46e3b7" />
-  <path d="M386 227 L386 217 L394 217 C397 217 399 219 399 222 C399 225 397 227 394 227 Z" fill="#0f172a" />
-  <text class="node-title" x="418" y="220">Render build</text>
-  <text class="node-sub" x="418" y="244">Docker multi-stage build</text>
+  <rect class="node" x="358" y="210" width="230" height="150" rx="16" />
+  <circle class="icon-ring" cx="394" cy="246" r="20" />
+  <rect x="382" y="234" width="24" height="24" rx="6" fill="#46e3b7" />
+  <path d="M388 252 V240 H396 C400 240 402 242 402 246 C402 250 400 252 396 252 Z" fill="#12263f" />
+  <text class="node-title" x="424" y="248">Render build</text>
+  <text class="node-sub" x="424" y="272">Docker multi-stage</text>
 
-  <rect class="node" x="630" y="186" width="242" height="170" />
-  <circle class="icon-bg" cx="662" cy="222" r="17" />
-  <path d="M653 212 H668 L673 217 V232 H653 Z" fill="#eaf1ff" stroke="#5f7fb5" stroke-width="1.2" />
-  <path d="M668 212 V217 H673" fill="none" stroke="#5f7fb5" stroke-width="1.2" />
-  <text x="662" y="228" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="8" font-weight="700" fill="#36558a">CSV</text>
-  <text class="node-title" x="690" y="220">Download CSV</text>
-  <text class="node-sub" x="690" y="244">Eviction Lab county data</text>
+  <rect class="node" x="616" y="210" width="230" height="150" rx="16" />
+  <circle class="icon-ring" cx="652" cy="246" r="20" />
+  <path d="M642 234 H659 L664 239 V258 H642 Z" fill="#ecf2ff" stroke="#5f7fb5" stroke-width="1.2" />
+  <path d="M659 234 V239 H664" fill="none" stroke="#5f7fb5" stroke-width="1.2" />
+  <text x="653" y="250" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="700" fill="#355788">CSV</text>
+  <text class="node-title" x="682" y="248">Download CSV</text>
+  <text class="node-sub" x="682" y="272">Eviction Lab data</text>
 
-  <rect class="node" x="902" y="186" width="242" height="170" />
-  <circle class="icon-bg" cx="934" cy="222" r="17" />
-  <path d="M925 216 C925 212 928 210 932 210 H936 V218 H930 C927 218 925 220 925 223 C925 226 927 228 930 228 H936 V234 H932 C928 234 925 232 925 228 Z" fill="#3776ab" />
-  <path d="M943 216 C943 212 940 210 936 210 H932 V218 H938 C941 218 943 220 943 223 C943 226 941 228 938 228 H932 V234 H936 C940 234 943 232 943 228 Z" fill="#ffd343" />
-  <text class="node-title" x="962" y="220">Train model</text>
-  <text class="node-sub" x="962" y="244">Python + scikit-learn</text>
+  <rect class="node" x="874" y="210" width="230" height="150" rx="16" />
+  <circle class="icon-ring" cx="910" cy="246" r="20" />
+  <path d="M900 239 C900 235 903 233 907 233 H912 V243 H906 C903 243 901 245 901 248 C901 251 903 253 906 253 H912 V259 H907 C903 259 900 257 900 253 Z" fill="#3776ab" />
+  <path d="M920 239 C920 235 917 233 913 233 H908 V243 H914 C917 243 919 245 919 248 C919 251 917 253 914 253 H908 V259 H913 C917 259 920 257 920 253 Z" fill="#ffd343" />
+  <text class="node-title" x="940" y="248">Train model</text>
+  <text class="node-sub" x="940" y="272">Python + scikit-learn</text>
 
-  <rect class="node" x="1174" y="186" width="242" height="170" />
-  <circle class="icon-bg" cx="1206" cy="222" r="17" />
-  <rect x="1195" y="222" width="20" height="9" rx="3" fill="#2496ed" />
-  <rect x="1197" y="213" width="6" height="6" fill="#2496ed" />
-  <rect x="1205" y="213" width="6" height="6" fill="#2496ed" />
-  <rect x="1213" y="213" width="6" height="6" fill="#2496ed" />
-  <circle cx="1221" cy="226" r="2.2" fill="#2496ed" />
-  <text class="node-title" x="1234" y="220">Package runtime image</text>
-  <text class="node-sub" x="1234" y="244">Copy model artifacts only</text>
+  <rect class="node" x="1132" y="210" width="230" height="150" rx="16" />
+  <circle class="icon-ring" cx="1168" cy="246" r="20" />
+  <rect x="1156" y="246" width="23" height="10" rx="3" fill="#2496ed" />
+  <rect x="1158" y="236" width="7" height="7" fill="#2496ed" />
+  <rect x="1167" y="236" width="7" height="7" fill="#2496ed" />
+  <rect x="1176" y="236" width="7" height="7" fill="#2496ed" />
+  <circle cx="1186" cy="251" r="2.2" fill="#2496ed" />
+  <text class="node-title" x="1198" y="248">Package runtime image</text>
+  <text class="node-sub" x="1198" y="272">Copy model artifacts only</text>
 
-  <rect class="node" x="1446" y="186" width="190" height="170" />
-  <circle class="icon-bg" cx="1478" cy="222" r="17" />
-  <path d="M1476 211 L1483 218 L1479 222 L1484 227 L1478 233 L1473 228 L1469 232 L1468 222 Z" fill="#46e3b7" stroke="#19745f" stroke-width="1" />
-  <text class="node-title" x="1504" y="220">Deploy (Render)</text>
-  <text class="node-sub" x="1504" y="244">Publish public service</text>
+  <rect class="node" x="1390" y="210" width="230" height="150" rx="16" />
+  <circle class="icon-ring" cx="1426" cy="246" r="20" />
+  <path d="M1420 256 L1431 246 L1438 253 L1427 263 Z" fill="#46e3b7" />
+  <path d="M1430 247 L1427 236 L1437 239 Z" fill="#46e3b7" />
+  <text class="node-title" x="1456" y="248">Deploy (Render)</text>
+  <text class="node-sub" x="1456" y="272">Public release</text>
 
-  <!-- Lane A arrows -->
-  <path class="arrow" d="M328 271 H358" />
-  <path class="arrow" d="M600 271 H630" />
-  <path class="arrow" d="M872 271 H902" />
-  <path class="arrow" d="M1144 271 H1174" />
-  <path class="arrow" d="M1416 271 H1446" />
+  <!-- Build arrows -->
+  <path class="arrow" d="M330 285 H358" />
+  <path class="arrow" d="M588 285 H616" />
+  <path class="arrow" d="M846 285 H874" />
+  <path class="arrow" d="M1104 285 H1132" />
+  <path class="arrow" d="M1362 285 H1390" />
 
-  <!-- Lane B nodes -->
-  <rect class="node" x="112" y="560" width="330" height="170" />
-  <circle class="icon-bg" cx="146" cy="596" r="17" />
-  <rect x="136" y="587" width="20" height="14" rx="2.5" fill="#4f7ec9" />
-  <rect x="140" y="603" width="12" height="2.6" rx="1" fill="#4f7ec9" />
-  <text class="node-title" x="176" y="594">Static demo UI (/demo)</text>
-  <text class="node-sub" x="176" y="618">Browser request from end user</text>
+  <!-- Runtime lane nodes -->
+  <rect class="node" x="95" y="590" width="350" height="160" rx="16" />
+  <circle class="icon-ring" cx="131" cy="626" r="20" />
+  <rect x="120" y="616" width="22" height="14" rx="2.5" fill="#4f7ec9" />
+  <rect x="124" y="633" width="14" height="3" rx="1.5" fill="#4f7ec9" />
+  <text class="node-title" x="161" y="628">Static demo UI (/demo)</text>
+  <text class="node-sub" x="161" y="652">User submits county request</text>
 
-  <rect class="node" x="482" y="560" width="330" height="170" />
-  <circle class="icon-bg" cx="516" cy="596" r="17" />
-  <path d="M513 585 L521 585 L517 594 H523 L511 607 L514 598 H509 Z" fill="#009688" />
-  <text class="node-title" x="546" y="594">FastAPI service</text>
-  <text class="node-sub" x="546" y="618">/score, /score/batch, /metadata, /health</text>
+  <rect class="node" x="485" y="590" width="350" height="160" rx="16" />
+  <circle class="icon-ring" cx="521" cy="626" r="20" />
+  <path d="M517 612 L526 612 L521 622 H528 L514 639 L518 627 H511 Z" fill="#009688" />
+  <text class="node-title" x="551" y="628">FastAPI service</text>
+  <text class="node-sub" x="551" y="652">/score /score/batch /metadata /health</text>
 
-  <rect class="node" x="852" y="560" width="330" height="170" />
-  <circle class="icon-bg" cx="886" cy="596" r="17" />
-  <ellipse cx="886" cy="589" rx="10" ry="4.5" fill="#4a6fb2" />
-  <rect x="876" y="589" width="20" height="13" fill="#4a6fb2" />
-  <ellipse cx="886" cy="602" rx="10" ry="4.5" fill="#4a6fb2" />
-  <text class="node-title" x="916" y="594">Model artifacts</text>
-  <text class="node-sub" x="916" y="618">joblib + metadata + feature table</text>
+  <rect class="node" x="875" y="590" width="350" height="160" rx="16" />
+  <circle class="icon-ring" cx="911" cy="626" r="20" />
+  <ellipse cx="911" cy="619" rx="10" ry="4.5" fill="#4a6fb2" />
+  <rect x="901" y="619" width="20" height="13" fill="#4a6fb2" />
+  <ellipse cx="911" cy="632" rx="10" ry="4.5" fill="#4a6fb2" />
+  <text class="node-title" x="941" y="628">Model artifacts</text>
+  <text class="node-sub" x="941" y="652">joblib + metadata + feature table</text>
+  <rect class="chip" x="941" y="671" width="255" height="30" rx="10" />
+  <text class="chip-text" x="954" y="691">Built at deploy-time, loaded at startup</text>
 
-  <rect class="chip" x="916" y="647" width="244" height="28" />
-  <text class="chip-text" x="928" y="666">Built at deploy-time, loaded at startup</text>
+  <rect class="node" x="1265" y="590" width="350" height="160" rx="16" />
+  <circle class="icon-ring" cx="1301" cy="626" r="20" />
+  <path d="M1290 637 L1298 629 L1304 632 L1313 620" fill="none" stroke="#2757a4" stroke-width="2.3" />
+  <circle cx="1290" cy="637" r="2.4" fill="#2757a4" />
+  <circle cx="1298" cy="629" r="2.4" fill="#2757a4" />
+  <circle cx="1304" cy="632" r="2.4" fill="#2757a4" />
+  <circle cx="1313" cy="620" r="2.4" fill="#2757a4" />
+  <text class="node-title" x="1331" y="628">Output</text>
+  <text class="node-sub" x="1331" y="652">risk_score + percentile response</text>
 
-  <rect class="node" x="1222" y="560" width="386" height="170" />
-  <circle class="icon-bg" cx="1256" cy="596" r="17" />
-  <path d="M1246 604 L1252 597 L1258 600 L1266 590" fill="none" stroke="#2555a0" stroke-width="2.1" />
-  <circle cx="1246" cy="604" r="2.4" fill="#2555a0" />
-  <circle cx="1252" cy="597" r="2.4" fill="#2555a0" />
-  <circle cx="1258" cy="600" r="2.4" fill="#2555a0" />
-  <circle cx="1266" cy="590" r="2.4" fill="#2555a0" />
-  <text class="node-title" x="1286" y="594">Output</text>
-  <text class="node-sub" x="1286" y="618">risk_score + percentile (response)</text>
-
-  <!-- Lane B arrows -->
-  <path class="arrow" d="M442 645 H482" />
-  <path class="arrow" d="M812 645 H852" />
-  <path class="arrow" d="M1182 645 H1222" />
+  <!-- Runtime arrows -->
+  <path class="arrow" d="M445 670 H485" />
+  <path class="arrow" d="M835 670 H875" />
+  <path class="arrow" d="M1225 670 H1265" />
 </svg>
