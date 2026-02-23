@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API | Cosign Eviction Risk Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/demo/styles.css" />
+    <script src="/demo/app.js" defer></script>
+  </head>
+  <body data-page="api">
+    <header class="site-nav">
+      <div class="site-nav-inner container">
+        <a href="/demo/" class="brand">Cosign Eviction Risk Demo</a>
+        <nav class="nav-links" aria-label="Main">
+          <a data-nav="demo" href="/demo/">Demo</a>
+          <a data-nav="about" href="/demo/about.html">About</a>
+          <a data-nav="api" href="/demo/api.html">API</a>
+          <a href="/docs" target="_blank" rel="noopener">Swagger</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero card">
+        <p class="eyebrow">API Quickstart</p>
+        <h1>Endpoints and copy/paste examples.</h1>
+        <p class="subtitle">
+          This frontend uses same-origin API calls to the FastAPI backend. Full interactive docs are available at
+          <a href="/docs" target="_blank" rel="noopener">/docs</a>.
+        </p>
+      </section>
+
+      <section class="card prose">
+        <h2>Endpoints</h2>
+        <ul>
+          <li><code>GET /health</code></li>
+          <li><code>GET /metadata</code></li>
+          <li><code>POST /score</code></li>
+          <li><code>POST /score/batch</code></li>
+        </ul>
+
+        <h2><code>/score</code> (county_fips only)</h2>
+        <pre class="code-block"><code>curl -X POST http://127.0.0.1:8000/score \
+  -H "Content-Type: application/json" \
+  -d '{"county_fips":"39049"}'</code></pre>
+
+        <h2><code>/score</code> (county_fips + as_of_year)</h2>
+        <pre class="code-block"><code>curl -X POST http://127.0.0.1:8000/score \
+  -H "Content-Type: application/json" \
+  -d '{"county_fips":"39049","as_of_year":2015}'</code></pre>
+
+        <h2><code>/score/batch</code> (2 counties, one with year omitted)</h2>
+        <pre class="code-block"><code>curl -X POST http://127.0.0.1:8000/score/batch \
+  -H "Content-Type: application/json" \
+  -d '[{"county_fips":"39049","as_of_year":2015},{"county_fips":"06037"}]'</code></pre>
+      </section>
+    </main>
+  </body>
+</html>

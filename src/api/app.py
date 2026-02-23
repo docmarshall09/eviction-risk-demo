@@ -4,6 +4,7 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from src.api.schemas import MetadataResponse, ScoreRequest, ScoreResponse
 from src.services.eviction_lab_scoring_service import (
@@ -38,6 +39,8 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    app.mount("/demo", StaticFiles(directory="web", html=True), name="demo")
 
     @app.get("/health")
     def health() -> dict[str, str]:

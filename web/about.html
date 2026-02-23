@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About | Cosign Eviction Risk Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/demo/styles.css" />
+    <script src="/demo/app.js" defer></script>
+  </head>
+  <body data-page="about">
+    <header class="site-nav">
+      <div class="site-nav-inner container">
+        <a href="/demo/" class="brand">Cosign Eviction Risk Demo</a>
+        <nav class="nav-links" aria-label="Main">
+          <a data-nav="demo" href="/demo/">Demo</a>
+          <a data-nav="about" href="/demo/about.html">About</a>
+          <a data-nav="api" href="/demo/api.html">API</a>
+          <a href="/docs" target="_blank" rel="noopener">Swagger</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero card">
+        <p class="eyebrow">Model Summary</p>
+        <h1>What this demo predicts and what it does not.</h1>
+        <p class="subtitle">This page explains the label, features, data source, and practical limitations.</p>
+      </section>
+
+      <section class="card prose">
+        <h2>Label</h2>
+        <p>
+          The model predicts whether a county will land in the next year&rsquo;s top quartile of
+          <code>filing_rate</code>.
+        </p>
+
+        <h2>Features</h2>
+        <ul>
+          <li><code>lag_1</code></li>
+          <li><code>lag_3_mean_obs</code></li>
+          <li><code>lag_5_mean_obs</code></li>
+          <li><code>years_since_last_obs</code></li>
+        </ul>
+
+        <h2>Data Source</h2>
+        <p>
+          Princeton Eviction Lab county-level observed/validated data, sourced from
+          <code>county_proprietary_valid_2000_2018.csv</code>.
+        </p>
+
+        <h2>Limitations</h2>
+        <ul>
+          <li>Outcomes end at the 2018 outcome-year.</li>
+          <li>Predictions are county-level only.</li>
+          <li>This is a demo and not a causal model.</li>
+          <li>Scores reflect historical correlations, not guarantees.</li>
+          <li>Do not use this demo for high-stakes decisions.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cosign Eviction Risk Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/demo/styles.css" />
+    <script src="/demo/app.js" defer></script>
+  </head>
+  <body data-page="demo">
+    <header class="site-nav">
+      <div class="site-nav-inner container">
+        <a href="/demo/" class="brand">Cosign Eviction Risk Demo</a>
+        <nav class="nav-links" aria-label="Main">
+          <a data-nav="demo" href="/demo/">Demo</a>
+          <a data-nav="about" href="/demo/about.html">About</a>
+          <a data-nav="api" href="/demo/api.html">API</a>
+          <a href="/docs" target="_blank" rel="noopener">Swagger</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero card">
+        <p class="eyebrow">Eviction Lab Yearly Risk API</p>
+        <h1>Score one county and interpret the result in seconds.</h1>
+        <p class="subtitle">
+          Enter a county FIPS and optional year. If year is blank, the API scores the latest available year for that
+          county.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>County Score</h2>
+        <form id="score-form" novalidate>
+          <div class="form-grid">
+            <label class="field">
+              <span>county_fips</span>
+              <input id="county_fips" name="county_fips" inputmode="numeric" placeholder="39049" maxlength="5" required />
+            </label>
+            <label class="field">
+              <span>as_of_year (optional)</span>
+              <input id="as_of_year" name="as_of_year" inputmode="numeric" placeholder="2015" maxlength="4" />
+            </label>
+          </div>
+          <div class="form-actions">
+            <button id="score-button" type="submit">Score</button>
+            <p class="helper">Try <code>39049</code> with year <code>2015</code>.</p>
+          </div>
+        </form>
+      </section>
+
+      <section id="error-card" class="card error-card hidden" role="alert" aria-live="assertive">
+        <h3>Request failed</h3>
+        <p><strong>Status:</strong> <span id="error-status">-</span></p>
+        <p id="error-message" class="error-message">Something went wrong.</p>
+      </section>
+
+      <section id="results-card" class="card hidden" aria-live="polite">
+        <div class="results-header">
+          <h2>Score Result</h2>
+          <p id="result-meta" class="muted"></p>
+        </div>
+
+        <div class="metrics-grid">
+          <article class="metric">
+            <p class="metric-label">risk_score</p>
+            <p id="metric-risk-score" class="metric-value">-</p>
+          </article>
+          <article class="metric">
+            <p class="metric-label">risk_percentile_in_year</p>
+            <p id="metric-risk-percentile" class="metric-value">-</p>
+          </article>
+          <article class="metric">
+            <p class="metric-label">as_of_year_available</p>
+            <p id="metric-year-available" class="metric-value">-</p>
+          </article>
+          <article class="metric">
+            <p class="metric-label">available_years_min</p>
+            <p id="metric-years-min" class="metric-value">-</p>
+          </article>
+          <article class="metric">
+            <p class="metric-label">available_years_max</p>
+            <p id="metric-years-max" class="metric-value">-</p>
+          </article>
+        </div>
+
+        <details class="details-panel">
+          <summary>Details</summary>
+          <div class="details-body">
+            <h3>features_used</h3>
+            <pre id="features-json" class="code-block">{}</pre>
+            <div id="notes-callout" class="note-callout hidden"></div>
+          </div>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>
