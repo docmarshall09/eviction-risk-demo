@@ -5,6 +5,7 @@ const FINDER_MAX_RESULTS = 12;
 (function initDemoSite() {
   setActiveNavLink();
   bindScoreForm();
+  bindModelParametersDebugSection();
 })();
 
 function setActiveNavLink() {
@@ -430,4 +431,129 @@ function formatInteger(value) {
     return "-";
   }
   return String(Math.trunc(numberValue));
+}
+
+function bindModelParametersDebugSection() {
+  const section = document.getElementById("model-params-section");
+  if (!section) {
+    return;
+  }
+
+  if (!isDebugModeEnabled()) {
+    return;
+  }
+
+  section.classList.remove("hidden");
+  loadAndRenderModelParameters();
+}
+
+function isDebugModeEnabled() {
+  const query = new URLSearchParams(window.location.search);
+  return query.get("debug") === "1";
+}
+
+async function loadAndRenderModelParameters() {
+  const statusElement = document.getElementById("model-params-status");
+  const contentElement = document.getElementById("model-params-content");
+
+  if (!statusElement || !contentElement) {
+    return;
+  }
+
+  statusElement.textContent = "Loading metadata...";
+  contentElement.classList.add("hidden");
+
+  try {
+    const response = await fetch("/metadata", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    const metadata = await tryParseJson(response);
+
+    if (!response.ok || !metadata) {
+      const apiError = parseApiError(response.status, metadata);
+      statusElement.textContent = `Unable to load model metadata (${apiError.status}): ${apiError.message}`;
+      return;
+    }
+
+    renderModelParameters(metadata);
+    statusElement.textContent = "Loaded from GET /metadata";
+    contentElement.classList.remove("hidden");
+  } catch (error) {
+    statusElement.textContent = `Unable to load model metadata: ${getNetworkMessage(error)}`;
+  }
+}
+
+function renderModelParameters(metadata) {
+  const interceptElement = document.getElementById("model-params-intercept");
+  const featureOrderElement = document.getElementById("model-params-feature-order");
+  const coefficientBodyElement = document.getElementById("model-params-coef-body");
+  const calibrationElement = document.getElementById("model-params-calibration");
+  const scalerElement = document.getElementById("model-params-scaler");
+  const rawJsonElement = document.getElementById("model-params-json");
+
+  if (
+    !interceptElement ||
+    !featureOrderElement ||
+    !coefficientBodyElement ||
+    !calibrationElement ||
+    !scalerElement ||
+    !rawJsonElement
+  ) {
+    return;
+  }
+
+  const interceptValue = Number(metadata.intercept);
+  interceptElement.textContent = Number.isFinite(interceptValue) ? interceptValue.toFixed(6) : "-";
+
+  const featureOrder = Array.isArray(metadata.feature_order) ? metadata.feature_order : [];
+  featureOrderElement.textContent = featureOrder.length ? featureOrder.join(", ") : "-";
+
+  renderCoefficientTable(coefficientBodyElement, metadata.coefficients, featureOrder);
+
+  calibrationElement.textContent = JSON.stringify(metadata.calibration_params || {}, null, 2);
+  scalerElement.textContent = JSON.stringify(metadata.scaler_params || {}, null, 2);
+  rawJsonElement.textContent = JSON.stringify(metadata, null, 2);
+}
+
+function renderCoefficientTable(tableBodyElement, coefficients, featureOrder) {
+  tableBodyElement.textContent = "";
+
+  if (!coefficients || typeof coefficients !== "object") {
+    const fallbackRow = document.createElement("tr");
+    const fallbackCell = document.createElement("td");
+    fallbackCell.colSpan = 2;
+    fallbackCell.textContent = "No coefficient data available.";
+    fallbackRow.appendChild(fallbackCell);
+    tableBodyElement.appendChild(fallbackRow);
+    return;
+  }
+
+  const orderedFeatures = featureOrder.length ? featureOrder : Object.keys(coefficients);
+  for (const featureName of orderedFeatures) {
+    if (!(featureName in coefficients)) {
+      continue;
+    }
+
+    const row = document.createElement("tr");
+    const featureCell = document.createElement("td");
+    const weightCell = document.createElement("td");
+
+    featureCell.textContent = featureName;
+    const weightValue = Number(coefficients[featureName]);
+    weightCell.textContent = Number.isFinite(weightValue) ? weightValue.toFixed(6) : String(coefficients[featureName]);
+
+    row.appendChild(featureCell);
+    row.appendChild(weightCell);
+    tableBodyElement.appendChild(row);
+  }
+
+  if (tableBodyElement.childElementCount === 0) {
+    const fallbackRow = document.createElement("tr");
+    const fallbackCell = document.createElement("td");
+    fallbackCell.colSpan = 2;
+    fallbackCell.textContent = "No coefficient data available.";
+    fallbackRow.appendChild(fallbackCell);
+    tableBodyElement.appendChild(fallbackRow);
+  }
 }

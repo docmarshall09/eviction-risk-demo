@@ -78,6 +78,180 @@ def _read_json_if_exists(path: Path) -> Optional[Dict[str, Any]]:
         return json.load(input_file)
 
 
+def _to_float_list(values: Any) -> list[float]:
+    """Convert an array-like object to a list of floats."""
+    if values is None:
+        return []
+    try:
+        return [float(value) for value in list(values)]
+    except TypeError:
+        return []
+
+
+def _candidate_estimators(model: Any) -> list[Any]:
+    """Collect likely estimator objects for metadata extraction."""
+    candidates: list[Any] = [model]
+
+    direct_estimator = getattr(model, "estimator", None)
+    if direct_estimator is not None:
+        candidates.append(direct_estimator)
+        nested_estimator = getattr(direct_estimator, "estimator", None)
+        if nested_estimator is not None:
+            candidates.append(nested_estimator)
+
+    calibrated_estimators = getattr(model, "calibrated_classifiers_", [])
+    if calibrated_estimators:
+        first_calibrated = calibrated_estimators[0]
+        calibrated_estimator = getattr(first_calibrated, "estimator", None)
+        if calibrated_estimator is not None:
+            candidates.append(calibrated_estimator)
+            nested_estimator = getattr(calibrated_estimator, "estimator", None)
+            if nested_estimator is not None:
+                candidates.append(nested_estimator)
+
+    return candidates
+
+
+def _final_step_if_pipeline(estimator: Any) -> Any:
+    """Return the final model step for pipeline-like estimators."""
+    named_steps = getattr(estimator, "named_steps", None)
+    if named_steps is None:
+        return estimator
+
+    if not named_steps:
+        return estimator
+
+    step_names = list(named_steps.keys())
+    last_step_name = step_names[-1]
+    return named_steps[last_step_name]
+
+
+def _extract_linear_model_params(model: Any) -> Dict[str, Any]:
+    """Extract intercept/coefficients/feature order from the loaded model."""
+    intercept: Optional[float] = None
+    coefficients: Optional[Dict[str, float]] = None
+
+    feature_order: list[str] = []
+    if hasattr(model, "feature_names_in_"):
+        feature_order = [str(name) for name in list(model.feature_names_in_)]
+    else:
+        feature_order = list(MODEL_FEATURE_COLUMNS)
+
+    for candidate in _candidate_estimators(model):
+        estimator = _final_step_if_pipeline(candidate)
+        coef_values = getattr(estimator, "coef_", None)
+        intercept_values = getattr(estimator, "intercept_", None)
+
+        if coef_values is None or intercept_values is None:
+            continue
+
+        intercept_list = _to_float_list(intercept_values)
+        if intercept_list:
+            intercept = float(intercept_list[0])
+
+        coef_rows = list(coef_values)
+        if not coef_rows:
+            continue
+
+        coef_vector = _to_float_list(coef_rows[0])
+        if not coef_vector:
+            continue
+
+        if len(feature_order) != len(coef_vector):
+            feature_order = list(MODEL_FEATURE_COLUMNS)
+
+        coefficients = {
+            feature_name: float(coef_vector[index])
+            for index, feature_name in enumerate(feature_order)
+            if index < len(coef_vector)
+        }
+        break
+
+    return {
+        "intercept": intercept,
+        "coefficients": coefficients,
+        "feature_order": feature_order,
+    }
+
+
+def _extract_calibration_params(model: Any) -> Optional[Dict[str, Any]]:
+    """Extract calibration details from calibrated models when present."""
+    calibrated_estimators = getattr(model, "calibrated_classifiers_", [])
+    if not calibrated_estimators:
+        return None
+
+    first_calibrated = calibrated_estimators[0]
+    calibration_method = str(
+        getattr(model, "calibration_method", getattr(first_calibrated, "method", "unknown"))
+    )
+    payload: Dict[str, Any] = {"method": calibration_method}
+
+    calibration_time_values = getattr(model, "calibration_time_values", None)
+    if calibration_time_values is not None:
+        payload["calibration_time_values"] = list(calibration_time_values)
+
+    calibrators = getattr(first_calibrated, "calibrators", None)
+    if calibrators and len(calibrators) > 0:
+        calibrator = calibrators[0]
+
+        if hasattr(calibrator, "a_") and hasattr(calibrator, "b_"):
+            payload["params"] = {
+                "a": float(getattr(calibrator, "a_")),
+                "b": float(getattr(calibrator, "b_")),
+            }
+            return payload
+
+        if hasattr(calibrator, "X_thresholds_") and hasattr(calibrator, "y_thresholds_"):
+            x_thresholds = _to_float_list(getattr(calibrator, "X_thresholds_"))
+            y_thresholds = _to_float_list(getattr(calibrator, "y_thresholds_"))
+            if x_thresholds and y_thresholds:
+                payload["params"] = {
+                    "n_thresholds": len(x_thresholds),
+                    "x_min": float(min(x_thresholds)),
+                    "x_max": float(max(x_thresholds)),
+                    "y_min": float(min(y_thresholds)),
+                    "y_max": float(max(y_thresholds)),
+                    "out_of_bounds": getattr(calibrator, "out_of_bounds", None),
+                }
+                return payload
+
+    return payload
+
+
+def _extract_scaler_params(model: Any) -> Optional[Dict[str, Any]]:
+    """Extract scaler parameters when a scaler is present in the model stack."""
+    for candidate in _candidate_estimators(model):
+        pipeline_steps = getattr(candidate, "named_steps", None)
+        if pipeline_steps is not None:
+            for step_name, step_value in pipeline_steps.items():
+                mean_values = _to_float_list(getattr(step_value, "mean_", None))
+                scale_values = _to_float_list(getattr(step_value, "scale_", None))
+                var_values = _to_float_list(getattr(step_value, "var_", None))
+                if not mean_values and not scale_values and not var_values:
+                    continue
+                return {
+                    "step_name": str(step_name),
+                    "class_name": step_value.__class__.__name__,
+                    "mean": mean_values or None,
+                    "scale": scale_values or None,
+                    "var": var_values or None,
+                }
+
+        mean_values = _to_float_list(getattr(candidate, "mean_", None))
+        scale_values = _to_float_list(getattr(candidate, "scale_", None))
+        var_values = _to_float_list(getattr(candidate, "var_", None))
+        if not mean_values and not scale_values and not var_values:
+            continue
+        return {
+            "class_name": candidate.__class__.__name__,
+            "mean": mean_values or None,
+            "scale": scale_values or None,
+            "var": var_values or None,
+        }
+
+    return None
+
+
 class EvictionLabScoringService:
     """Lazy-loading scoring service for Eviction Lab yearly artifacts."""
 
@@ -277,6 +451,10 @@ class EvictionLabScoringService:
     def get_metadata(self) -> Dict[str, Any]:
         """Return metadata for API About/docs usage."""
         metadata = self._load_metadata().copy()
+        model = self._load_model()
+        linear_params = _extract_linear_model_params(model)
+        calibration_params = _extract_calibration_params(model)
+        scaler_params = _extract_scaler_params(model)
 
         return {
             "model_version": metadata["model_version"],
@@ -286,6 +464,11 @@ class EvictionLabScoringService:
             "feature_list": metadata["feature_list"],
             "metrics_summary": metadata.get("metrics_summary"),
             "limitations": metadata["limitations"],
+            "intercept": linear_params.get("intercept"),
+            "coefficients": linear_params.get("coefficients"),
+            "feature_order": linear_params.get("feature_order"),
+            "calibration_params": calibration_params,
+            "scaler_params": scaler_params,
         }
 
     def _get_county_feature_rows(

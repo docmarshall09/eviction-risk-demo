@@ -698,6 +698,37 @@ button:disabled {
   background: #edf3ff;
 }
 
+.coef-table-wrap {
+  overflow-x: auto;
+}
+
+.coef-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fcfdff;
+}
+
+.coef-table th,
+.coef-table td {
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid #e8eefb;
+  font-size: 0.9rem;
+}
+
+.coef-table th {
+  background: #f3f7ff;
+  color: #28467f;
+  font-weight: 700;
+}
+
+.coef-table tr:last-child td {
+  border-bottom: none;
+}
+
 code {
   background: #eef3ff;
   border: 1px solid #dbe5ff;

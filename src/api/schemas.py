@@ -124,6 +124,11 @@ class MetadataResponse(BaseModel):
     feature_list: List[str]
     metrics_summary: Optional[Dict[str, Any]]
     limitations: List[str]
+    intercept: Optional[float] = None
+    coefficients: Optional[Dict[str, float]] = None
+    feature_order: Optional[List[str]] = None
+    calibration_params: Optional[Dict[str, Any]] = None
+    scaler_params: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -147,6 +152,24 @@ class MetadataResponse(BaseModel):
                     "Dataset ends at 2018 outcome year.",
                     "Irregular county-year panel without gap filling.",
                 ],
+                "intercept": -10.8238,
+                "coefficients": {
+                    "lag_1": 2.6394,
+                    "lag_3_mean_obs": 0.9750,
+                    "lag_5_mean_obs": -0.1943,
+                    "years_since_last_obs": -0.4806,
+                },
+                "feature_order": [
+                    "lag_1",
+                    "lag_3_mean_obs",
+                    "lag_5_mean_obs",
+                    "years_since_last_obs",
+                ],
+                "calibration_params": {
+                    "method": "sigmoid",
+                    "params": {"a": -4.32, "b": 2.11},
+                },
+                "scaler_params": None,
             }
         }
     )

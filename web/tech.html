@@ -106,6 +106,45 @@
   -H "Content-Type: application/json" \
   -d '[{"county_fips":"39049","as_of_year":2015},{"county_fips":"06037"}]'</code></pre>
       </section>
+
+      <section id="model-params-section" class="card prose hidden">
+        <h2>Model parameters</h2>
+        <p class="subtitle">
+          Debug view. This block is shown only when the URL includes <code>?debug=1</code>.
+        </p>
+        <p id="model-params-status" class="muted">Loading metadata...</p>
+
+        <div id="model-params-content" class="hidden">
+          <p><strong>intercept:</strong> <code id="model-params-intercept">-</code></p>
+          <p><strong>feature_order:</strong> <code id="model-params-feature-order">-</code></p>
+
+          <h3>coefficients</h3>
+          <div class="coef-table-wrap">
+            <table class="coef-table">
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Weight</th>
+                </tr>
+              </thead>
+              <tbody id="model-params-coef-body">
+                <tr>
+                  <td colspan="2">No coefficient data available.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>calibration_params</h3>
+          <pre id="model-params-calibration" class="code-block">{}</pre>
+
+          <h3>scaler_params</h3>
+          <pre id="model-params-scaler" class="code-block">{}</pre>
+
+          <h3>raw metadata JSON</h3>
+          <pre id="model-params-json" class="code-block">{}</pre>
+        </div>
+      </section>
     </main>
   </body>
 </html>
