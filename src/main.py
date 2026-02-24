@@ -62,6 +62,7 @@ from src.models.eviction_risk_model import (
     split_train_test_by_time,
     train_model,
 )
+from src.pipelines.yearly_training_dataset import build_yearly_training_dataset
 from src.reporting.eviction_lab_backtest_report import write_backtest_summary_report
 
 
@@ -140,10 +141,7 @@ def _standardize_yearly_feature_df(feature_df: pd.DataFrame) -> pd.DataFrame:
 
 def _get_labeled_yearly_rows(feature_df: pd.DataFrame) -> pd.DataFrame:
     """Return rows that are fully labeled and model-ready for yearly training."""
-    required_columns = MODEL_FEATURE_COLUMNS + ["y", "sample_weight", "outcome_year"]
-    labeled_df = feature_df.dropna(subset=required_columns).copy()
-    labeled_df["y"] = labeled_df["y"].astype(int)
-    return labeled_df
+    return build_yearly_training_dataset(feature_df)
 
 
 def _load_and_clean_raw_data() -> pd.DataFrame:
