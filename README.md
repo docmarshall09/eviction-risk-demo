@@ -1,154 +1,108 @@
-# eviction-risk-demo
+# Eviction Risk Scoring Engine
 
-This repository is a public-data underwriting risk proof of concept in Python.
-It includes a monthly county pipeline and a parallel yearly Eviction Lab pipeline for county-level context risk scoring.
+County-level eviction risk model with transparent coefficients, backtesting, and a live scoring API.
 
-## Required input files
+**What it does:** Predicts whether a U.S. county will land in the top quartile for eviction filing rates next year, using historical Eviction Lab data and a logistic regression model with fully exposed coefficients.
 
-Monthly pipeline input:
-- `data/raw/eviction_county_month.csv`
-- Required columns (case-insensitive): `county_fips`, `month`, `eviction_filing_rate`
+**Why it exists:** A hands-on project to deepen my skills in Python-based ML/regression modeling for credit risk evaluation — and to continue building fluency working alongside state-of-the-art coding agents as development partners. The goal was to build something real: a working risk scoring tool grounded in public eviction data that demonstrates interpretable modeling, production discipline, and insurance-relevant thinking.
 
-Yearly Eviction Lab pipeline input:
-- `data/raw/county_proprietary_valid_2000_2018.csv`
-- Expected columns include: `cofips`, `county`, `state`, `year`, `filings`, `filing_rate`
-- The yearly pipeline uses observed/validated annual rates and treats the data as an irregular panel (no gap-filling for missing years).
+**Live demo:** [eviction-risk-demo.onrender.com](https://eviction-risk-demo.onrender.com)
 
-## Setup
+---
+
+## Architecture
+
+- **Model:** Logistic regression (C=0.1) trained on county-year panels (2000–2017 features → 2001–2018 outcomes). Four features: `lag_1` (most recent filing rate), `lag_3_mean_obs` (3-year observed mean), `lag_5_mean_obs` (5-year observed mean), and `years_since_last_obs` (data staleness weight). Calibration guardrails prevent overconfident probability saturation.
+- **Backend:** FastAPI with Pydantic schemas, serving real-time county scoring
+- **Frontend:** Vanilla JS dashboard for interactive county lookup with inline model explainer
+- **Infrastructure:** Docker build-time training → baked model artifact → Render deployment
+- **Testing:** Smoke tests via FastAPI TestClient, temporal leakage assertions in training pipeline
+- **Provenance:** Every model artifact includes git SHA, library versions, and training timestamp
+
+## Key Design Decisions
+
+**Logistic regression is intentional.** Not because it's simple — because it's explainable. In regulated underwriting, you need to produce a reason for every decline. Transparent coefficients make that trivial. Gradient-boosted models score higher on Kaggle; interpretable models survive regulatory scrutiny.
+
+**Temporal leakage guards are enforced at runtime.** The training pipeline asserts that feature years are strictly less than outcome years before any model fitting. This isn't a test — it's a hard stop that prevents the single most dangerous failure mode in time-series ML.
+
+**Backtesting uses held-out outcome years, not random splits.** Train/test splits respect the time boundary that exists in production: you never have next year's data when you score today's applicant.
+
+**Model metadata is a first-class artifact.** The `/metadata` endpoint exposes training provenance (git SHA, sklearn version, training timestamp), feature list, regularization parameters, and performance summary. This supports model governance and audit without external tooling.
+
+## What We Learned
+
+Eviction filing rates are persistent year to year. In backtests, a naive baseline using only `lag_1` comes close to the full model — recent history carries most of the signal. The multi-lag feature set (`lag_3_mean_obs`, `lag_5_mean_obs`) and the `years_since_last_obs` staleness weight add incremental lift and handle the irregular county-year panel more robustly.
+
+## Endpoints
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/health` | GET | Service health check |
+| `/metadata` | GET | Model version, features, provenance, metrics summary |
+| `/score` | POST | Score a county by FIPS code and optional year |
+| `/demo/` | GET | Interactive frontend |
+
+## Local Development
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# Clone and install
+git clone https://github.com/docmarshall09/eviction-risk-demo.git
+cd eviction-risk-demo
 pip install -r requirements.txt
-```
 
-## API (local)
-
-Run the API server from your virtual environment:
-
-```bash
-source .venv/bin/activate
-python -m src.main --task serve_api
-```
-
-Interactive docs:
-- `http://127.0.0.1:8000/docs`
-- `http://127.0.0.1:8000/redoc`
-
-`/score` responses now include demo-friendly context fields:
-- `features_used`: the four model inputs for that county-year.
-- `risk_percentile_in_year`: percentile rank (0-100) among scoreable counties in that year.
-- `as_of_year_available`, `available_years_min`, `available_years_max`: availability context for requested year/county.
-
-`/score` request behavior:
-- `as_of_year` is optional. If omitted, the API uses the latest available scoreable year for that county.
-- Unknown county FIPS returns `404`.
-- Counties with no scoreable years return `422`.
-- If `as_of_year` is provided but unavailable for that county, the API returns `400` with available min/max years.
-
-Manual API checks:
-
-```bash
-curl -X POST http://127.0.0.1:8000/score \
-  -H "Content-Type: application/json" \
-  -d '{"county_fips":"39049"}'
-
-curl -X POST http://127.0.0.1:8000/score \
-  -H "Content-Type: application/json" \
-  -d '{"county_fips":"39049","as_of_year":2015}'
-```
-
-## Environment variables
-
-- `PORT`: API server port for `serve_api` (default `8000`).
-- `API_CORS_ORIGINS`: Comma-separated allowlist for CORS origins. Leave unset for no CORS.
-
-## Monthly pipeline tasks
-
-Train monthly model and write artifacts:
-
-```bash
-python -m src.main --task train_eviction_model
-```
-
-Score all counties for latest month:
-
-```bash
-python -m src.main --task score_latest
-```
-
-Score one county for latest month:
-
-```bash
-python -m src.main --task score_county --fips 39049
-```
-
-## Yearly Eviction Lab tasks
-
-Train yearly model and write artifacts:
-
-```bash
+# Train model and run backtest
 python -m src.main --task train_eviction_lab_yearly
-```
-
-Outputs:
-- `data/processed/eviction_lab_yearly_features.csv`
-- `models/eviction_lab_yearly_model.joblib`
-- `reports/eviction_lab_yearly_model_metrics.json`
-
-Score all counties for latest available year:
-
-```bash
-python -m src.main --task score_eviction_lab_latest_year
-```
-
-Output:
-- `reports/eviction_lab_county_risk_scores_latest_year.csv`
-
-Score one county for latest available year:
-
-```bash
-python -m src.main --task score_eviction_lab_county --fips 39049
-```
-
-## Backtesting
-
-Run leakage-safe yearly backtests using outcome-year holdouts:
-
-```bash
 python -m src.main --task backtest_eviction_lab_yearly
+
+# Start API locally
+python -m src.main --task serve_api
+
+# Run tests
+pytest tests/ -v
 ```
 
-Generate the full backtest markdown summary (also refreshes backtest artifacts):
+### Docker
 
 ```bash
-python -m src.main --task report_eviction_lab_backtest
+docker build -t eviction-risk-engine .
+docker run -p 8000:8000 eviction-risk-engine
 ```
 
-This command runs two evaluations:
-- Last outcome-year holdout (for example, 2018 when that is the latest year).
-- Last two outcome-years holdout (for example, 2017 and 2018).
+The Docker build downloads training data, trains the model, and bakes the artifact into the image. No external model registry required.
 
-Artifacts written:
-- `reports/eviction_lab_yearly_backtest_last_year.json`
-- `reports/eviction_lab_yearly_backtest_last_2_years.json`
-- `reports/eviction_lab_yearly_holdout_detail_last_year.csv`
-- `reports/eviction_lab_yearly_holdout_detail_last_2_years.csv`
+## Project Structure
 
-## Final retrain
-
-After reviewing backtest quality, retrain the yearly model on all labeled rows:
-
-```bash
-python -m src.main --task train_eviction_lab_yearly_final
+```
+src/
+├── api/                  # FastAPI app, Pydantic schemas
+├── config.py             # Paths, constants
+├── datasets/             # Data loading and validation
+├── features/             # Feature engineering
+├── main.py               # CLI orchestration
+├── models/               # Training, evaluation, scoring
+├── pipelines/            # Training dataset construction
+├── reporting/            # Backtest summary reports
+├── services/             # Scoring service layer
+└── validation/           # Temporal leakage guards
+tests/
+├── test_smoke.py         # API endpoint smoke tests
+└── test_leakage.py       # Leakage assertion unit tests
+web/                      # Frontend (vanilla HTML/CSS/JS)
 ```
 
-Then generate latest-year county scores:
+## Roadmap
 
-```bash
-python -m src.main --task score_eviction_lab_latest_year
-```
+The current model uses lag-1, lag-3, and lag-5 county-level filing rates with a recency weight for data gaps. Backtesting showed that lag-1 alone is a strong standalone predictor for the 2000–2018 panel, but the multi-lag approach handles irregular county-year coverage more robustly. Next steps focus on extending coverage and granularity:
 
-## Next steps
+* More recent data: The Eviction Lab dataset ends at 2018. Incorporate post-COVID filing data as it becomes available to test whether historical patterns hold.
+* Monthly granularity: Move from annual to monthly panels to capture seasonal patterns and enable faster model refresh cycles.
+* Spatial signals: Test whether neighboring-county filing rates carry predictive power (spatial autocorrelation / contagion effects).
+* Non-geographic applicant signals: Begin exploring applicant-level risk features — income stability, rent-to-income ratio, payment history, thin-file indicators — that complement geographic base rates in a full underwriting model.
 
-Next, we will expand this county-level context modeling baseline with additional portfolio use cases.
+## Data
+
+Training data: Princeton Eviction Lab county-level proprietary dataset (2000–2018). Downloaded at Docker build time.
+
+## License
+
+MIT
