@@ -33,6 +33,14 @@ _MOCK_METADATA = {
     "feature_order": ["lag_1", "lag_3_mean_obs", "lag_5_mean_obs", "years_since_last_obs"],
     "calibration_params": None,
     "scaler_params": None,
+    "provenance": {
+        "git_sha": "abc1234",
+        "trained_at_utc": "2026-01-01T00:00:00+00:00",
+        "python_version": "3.11.0",
+        "sklearn_version": "1.8.0",
+        "pandas_version": "3.0.1",
+        "numpy_version": "2.4.2",
+    },
 }
 
 _MOCK_SCORE = {
@@ -118,3 +126,15 @@ def test_score_malformed_input(client):
     """POST /score with no digits in county_fips returns 422 — validates Pydantic input rejection."""
     response = client.post("/score", json={"county_fips": "AAAA"})
     assert response.status_code == 422
+
+
+def test_metadata_provenance(client, mock_service):
+    """GET /metadata response includes a provenance block with all 6 required keys."""
+    with patch("src.api.app.get_scoring_service", return_value=mock_service):
+        response = client.get("/metadata")
+    assert response.status_code == 200
+    body = response.json()
+    assert "provenance" in body
+    provenance = body["provenance"]
+    for key in ("git_sha", "trained_at_utc", "python_version", "sklearn_version", "pandas_version", "numpy_version"):
+        assert key in provenance, f"provenance missing key: {key}"

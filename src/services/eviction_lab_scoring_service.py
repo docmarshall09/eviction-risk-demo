@@ -469,6 +469,7 @@ class EvictionLabScoringService:
             "feature_order": linear_params.get("feature_order"),
             "calibration_params": calibration_params,
             "scaler_params": scaler_params,
+            "provenance": metadata.get("provenance"),
         }
 
     def _get_county_feature_rows(

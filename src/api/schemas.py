@@ -129,6 +129,7 @@ class MetadataResponse(BaseModel):
     feature_order: Optional[List[str]] = None
     calibration_params: Optional[Dict[str, Any]] = None
     scaler_params: Optional[Dict[str, Any]] = None
+    provenance: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(
         json_schema_extra={

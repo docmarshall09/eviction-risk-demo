@@ -7,9 +7,12 @@ import logging
 import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Any
 
+import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.pipeline import Pipeline
 
 from src.config import (
@@ -240,6 +243,18 @@ def _build_model_version() -> str:
     return f"{timestamp}_{git_hash}"
 
 
+def _build_provenance() -> dict:
+    """Build a provenance block capturing the code, environment, and timestamp."""
+    return {
+        "git_sha": _get_git_short_hash(),
+        "trained_at_utc": datetime.now(timezone.utc).isoformat(),
+        "python_version": sys.version,
+        "sklearn_version": sklearn.__version__,
+        "pandas_version": pd.__version__,
+        "numpy_version": np.__version__,
+    }
+
+
 def _summarize_metrics_for_metadata(metrics_payload: dict | None) -> dict | None:
     """Create a compact metrics summary for metadata artifacts."""
     if metrics_payload is None:
@@ -307,6 +322,7 @@ def _build_yearly_model_metadata_payload(
             "Irregular county-year panel without gap filling.",
             "Scores depend on available county-year feature rows.",
         ],
+        "provenance": _build_provenance(),
     }
 
 
