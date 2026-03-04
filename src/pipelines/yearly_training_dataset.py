@@ -46,14 +46,7 @@ def _validate_required_columns(
 
 
 def build_yearly_training_dataset(feature_df: pd.DataFrame) -> pd.DataFrame:
-    """Build the exact yearly training dataframe used by CLI training tasks.
-
-    Args:
-        feature_df: Yearly feature table from the shared pipeline.
-
-    Returns:
-        Dataframe filtered to rows with complete model inputs and labels.
-    """
+    """Build the exact yearly training dataframe used by CLI training tasks."""
     _validate_required_columns(feature_df, TRAINING_REQUIRED_COLUMNS)
     labeled_df = feature_df.dropna(subset=TRAINING_REQUIRED_COLUMNS).copy()
     labeled_df["y"] = labeled_df["y"].astype(int)

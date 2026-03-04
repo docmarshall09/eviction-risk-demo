@@ -71,7 +71,6 @@ def create_app() -> FastAPI:
     @app.get("/")
     def root() -> RedirectResponse:
         """Redirect root requests to the static demo site."""
-        # Keep the default temporary redirect behavior.
         return RedirectResponse(url="/demo/")
 
     @app.get("/health")

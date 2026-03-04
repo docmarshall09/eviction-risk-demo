@@ -1,7 +1,7 @@
 """Model training, evaluation, persistence, and scoring for eviction risk."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import joblib
 import pandas as pd
@@ -23,7 +23,7 @@ CALIBRATION_DECILES = 10
 def split_train_test_by_time(
     feature_df: pd.DataFrame,
     test_months: int = TEST_MONTHS,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split data using the most recent months as test set."""
     unique_months = sorted(feature_df["month"].unique())
     if len(unique_months) <= test_months:
@@ -70,7 +70,7 @@ def _build_calibration_summary(
     y_true: pd.Series,
     y_prob: pd.Series,
     bins: int = CALIBRATION_DECILES,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Build a decile calibration summary from predicted probabilities."""
     calibration_df = pd.DataFrame({"y_true": y_true, "y_prob": y_prob}).copy()
 
@@ -103,7 +103,7 @@ def _build_calibration_summary(
     )
 
     summary_df = summary_df.reset_index().sort_values("decile")
-    summary: List[Dict[str, Any]] = []
+    summary: list[dict[str, Any]] = []
     for _, row in summary_df.iterrows():
         summary.append(
             {
@@ -117,14 +117,14 @@ def _build_calibration_summary(
     return summary
 
 
-def evaluate_model(model: Pipeline, test_df: pd.DataFrame) -> Dict[str, Any]:
+def evaluate_model(model: Pipeline, test_df: pd.DataFrame) -> dict[str, Any]:
     """Evaluate model performance on a time-based holdout set."""
     y_true = test_df["y"]
     y_prob = model.predict_proba(test_df[MODEL_FEATURE_COLUMNS])[:, 1]
     y_pred = (y_prob >= PROBABILITY_THRESHOLD).astype(int)
 
     unique_classes = sorted(y_true.unique().tolist())
-    auc: Optional[float]
+    auc: float | None
     if len(unique_classes) < 2:
         auc = None
     else:

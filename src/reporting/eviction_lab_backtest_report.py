@@ -481,14 +481,7 @@ def generate_backtest_summary_markdown(
 
 
 def write_backtest_summary_report(output_path: Path) -> str:
-    """Read backtest artifacts, generate markdown report, and write to disk.
-
-    Args:
-        output_path: Destination markdown path.
-
-    Returns:
-        Rendered markdown content.
-    """
+    """Read backtest artifacts, generate markdown report, and write to disk."""
     last_year_json = _read_json(EVICTION_LAB_BACKTEST_LAST_YEAR_PATH)
     last_two_json = _read_json(EVICTION_LAB_BACKTEST_LAST_TWO_YEARS_PATH)
 

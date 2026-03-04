@@ -32,13 +32,7 @@ class ScoringServiceError(Exception):
         status_code: int,
         details: dict[str, Any] | None = None,
     ) -> None:
-        """Initialize the service error.
-
-        Args:
-            message: Human-readable error message.
-            status_code: HTTP status code to use in API responses.
-            details: Optional structured detail payload for API clients.
-        """
+        """Initialize the service error."""
         super().__init__(message)
         self.status_code = status_code
         self.message = message
@@ -482,18 +476,7 @@ class EvictionLabScoringService:
         feature_df: pd.DataFrame,
         county_fips: str,
     ) -> pd.DataFrame:
-        """Return all feature rows for one county.
-
-        Args:
-            feature_df: Full processed feature table.
-            county_fips: Normalized 5-digit county code.
-
-        Returns:
-            DataFrame of rows for this county.
-
-        Raises:
-            ScoringServiceError: If county does not exist in the feature table.
-        """
+        """Return all feature rows for one county."""
         county_df = feature_df[feature_df["county_fips"] == county_fips].copy()
         if county_df.empty:
             raise ScoringServiceError(

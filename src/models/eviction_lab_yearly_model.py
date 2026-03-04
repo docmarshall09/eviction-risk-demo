@@ -2,7 +2,7 @@
 
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import joblib
 import pandas as pd
@@ -41,7 +41,7 @@ def _time_column_for_training(df: pd.DataFrame) -> str:
     return "year"
 
 
-def _split_fit_and_calibration_by_time(train_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def _split_fit_and_calibration_by_time(train_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split training rows into fit and calibration subsets by latest time bucket."""
     time_column = _time_column_for_training(train_df)
     unique_time_values = sorted(train_df[time_column].unique().tolist())
@@ -62,7 +62,7 @@ def _split_fit_and_calibration_by_time(train_df: pd.DataFrame) -> Tuple[pd.DataF
     return fit_df, calibration_df
 
 
-def _safe_auc(y_true: pd.Series, score: pd.Series) -> Optional[float]:
+def _safe_auc(y_true: pd.Series, score: pd.Series) -> float | None:
     """Compute AUC only when both classes are present."""
     if y_true.nunique() < 2:
         return None
@@ -139,7 +139,7 @@ def _build_prefit_calibrator(base_model: LogisticRegression, method: str) -> Cal
 def split_train_test_by_year(
     feature_df: pd.DataFrame,
     test_years: int = TEST_YEARS,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split labeled data by feature year using latest years as holdout."""
     labeled_df = _get_labeled_rows(feature_df)
     unique_years = sorted(labeled_df["year"].unique().tolist())
@@ -161,8 +161,8 @@ def split_train_test_by_year(
 
 def split_by_outcome_year(
     feature_df: pd.DataFrame,
-    holdout_outcome_years: List[int],
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    holdout_outcome_years: list[int],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split labeled rows by outcome_year for leakage-safe backtesting.
 
     Args:
@@ -231,7 +231,7 @@ def train_eviction_lab_yearly_model(train_df: pd.DataFrame) -> Any:
     return calibrated_model
 
 
-def get_model_training_details(model: Any) -> Dict[str, Any]:
+def get_model_training_details(model: Any) -> dict[str, Any]:
     """Extract model-training details stored on trained model objects."""
     return {
         "chosen_regularization_c": float(
@@ -248,7 +248,7 @@ def get_model_training_details(model: Any) -> Dict[str, Any]:
 def _build_calibration_summary(
     y_true: pd.Series,
     y_prob: pd.Series,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Summarize calibration quality by probability deciles."""
     calibration_df = pd.DataFrame({"y_true": y_true, "y_prob": y_prob}).copy()
 
@@ -277,7 +277,7 @@ def _build_calibration_summary(
         observed_rate=("y_true", "mean"),
     )
 
-    summary: List[Dict[str, Any]] = []
+    summary: list[dict[str, Any]] = []
     for decile, row in summary_df.iterrows():
         summary.append(
             {
@@ -293,7 +293,7 @@ def _build_calibration_summary(
 def evaluate_eviction_lab_yearly_model(
     model: Any,
     test_df: pd.DataFrame,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Evaluate yearly model on holdout years with threshold 0.5 metrics."""
     labeled_test_df = _get_labeled_rows(test_df)
     y_true = labeled_test_df["y"]
@@ -301,7 +301,7 @@ def evaluate_eviction_lab_yearly_model(
     y_pred = (y_prob >= PROBABILITY_THRESHOLD).astype(int)
 
     unique_classes = sorted(y_true.unique().tolist())
-    auc: Optional[float]
+    auc: float | None
     if len(unique_classes) < 2:
         auc = None
     else:
@@ -365,7 +365,7 @@ def build_holdout_detail(
     return detail_df.reset_index(drop=True)
 
 
-def _build_top_quartile_metrics_for_slice(slice_df: pd.DataFrame) -> Dict[str, Any]:
+def _build_top_quartile_metrics_for_slice(slice_df: pd.DataFrame) -> dict[str, Any]:
     """Compute precision, recall, and optional AUC for one evaluation slice."""
     y_true = slice_df["y"].astype(int)
     y_pred = slice_df["predicted_top_quartile"].astype(int)
@@ -374,7 +374,7 @@ def _build_top_quartile_metrics_for_slice(slice_df: pd.DataFrame) -> Dict[str, A
     recall = float(recall_score(y_true, y_pred, zero_division=0))
 
     unique_classes = sorted(y_true.unique().tolist())
-    auc: Optional[float]
+    auc: float | None
     if len(unique_classes) < 2:
         auc = None
     else:
@@ -392,12 +392,12 @@ def _build_top_quartile_metrics_for_slice(slice_df: pd.DataFrame) -> Dict[str, A
 def evaluate_at_top_quartile(
     model: Any,
     test_df: pd.DataFrame,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Evaluate model by top-quartile ranking within each outcome year."""
     detail_df = build_holdout_detail(model, test_df)
     holdout_years = sorted(detail_df["outcome_year"].astype(int).unique().tolist())
 
-    per_year_metrics: List[Dict[str, Any]] = []
+    per_year_metrics: list[dict[str, Any]] = []
     for outcome_year in holdout_years:
         year_slice = detail_df[detail_df["outcome_year"] == outcome_year].copy()
         year_metrics = _build_top_quartile_metrics_for_slice(year_slice)
