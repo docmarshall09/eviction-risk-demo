@@ -64,6 +64,7 @@ from src.models.eviction_risk_model import (
 )
 from src.pipelines.yearly_training_dataset import build_yearly_training_dataset
 from src.reporting.eviction_lab_backtest_report import write_backtest_summary_report
+from src.validation.leakage import assert_no_temporal_leakage
 
 
 LOGGER = logging.getLogger(__name__)
@@ -360,6 +361,8 @@ def run_train_eviction_lab_yearly() -> None:
             "No labeled yearly rows available after preprocessing. Check input data coverage."
         )
 
+    assert_no_temporal_leakage(labeled_df)
+
     train_df, test_df = split_train_test_by_year(labeled_df)
     model = train_eviction_lab_yearly_model(train_df)
     metrics = evaluate_eviction_lab_yearly_model(model, test_df)
@@ -411,6 +414,8 @@ def run_backtest_eviction_lab_yearly() -> None:
     feature_df = _load_or_build_yearly_feature_table()
     labeled_df = _get_labeled_yearly_rows(feature_df)
 
+    assert_no_temporal_leakage(labeled_df)
+
     outcome_years = sorted(labeled_df["outcome_year"].unique().tolist())
     if not outcome_years:
         raise ValueError("No labeled yearly rows found for backtesting.")
@@ -444,6 +449,8 @@ def run_train_eviction_lab_yearly_final() -> None:
 
     if labeled_df.empty:
         raise ValueError("No labeled yearly rows available for final retraining.")
+
+    assert_no_temporal_leakage(labeled_df)
 
     model = train_eviction_lab_yearly_model(labeled_df)
     save_eviction_lab_yearly_model(model, str(EVICTION_LAB_YEARLY_MODEL_PATH))
