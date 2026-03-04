@@ -128,6 +128,38 @@ def test_score_malformed_input(client):
     assert response.status_code == 422
 
 
+def test_score_unknown_fips_returns_clean_404(client, mock_service):
+    """POST /score with an unknown FIPS returns 404 with clean JSON — no traceback in body."""
+    mock_service.score_county.side_effect = ScoringServiceError(
+        "Unknown county_fips '99999'.", 404
+    )
+    with patch("src.api.app.get_scoring_service", return_value=mock_service):
+        response = client.post("/score", json={"county_fips": "99999"})
+    assert response.status_code == 404
+    body = response.json()
+    assert "detail" in body
+    assert "Traceback" not in body.get("detail", "")
+    assert "99999" in body["detail"]
+
+
+def test_score_unexpected_server_error_returns_clean_500(mock_service):
+    """POST /score with a service that raises an unexpected exception returns 500 with no traceback.
+
+    Uses raise_server_exceptions=False so TestClient returns the 500 response
+    rather than re-raising the exception in the test thread.
+    """
+    from starlette.testclient import TestClient as _TestClient
+    safe_client = _TestClient(app, raise_server_exceptions=False)
+    mock_service.score_county.side_effect = RuntimeError("internal pandas failure")
+    with patch("src.api.app.get_scoring_service", return_value=mock_service):
+        response = safe_client.post("/score", json={"county_fips": "39049"})
+    assert response.status_code == 500
+    body = response.json()
+    assert "detail" in body
+    assert "Traceback" not in str(body)
+    assert "internal pandas failure" not in str(body)
+
+
 def test_metadata_provenance(client, mock_service):
     """GET /metadata response includes a provenance block with all 6 required keys."""
     with patch("src.api.app.get_scoring_service", return_value=mock_service):

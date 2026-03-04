@@ -1,17 +1,21 @@
 """FastAPI application for Eviction Lab yearly model scoring."""
 
+import logging
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from src.api.exceptions import CountyNotFoundError, ScoringError
 from src.api.schemas import MetadataResponse, ScoreRequest, ScoreResponse
 from src.services.eviction_lab_scoring_service import (
     ScoringServiceError,
     get_scoring_service,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _get_cors_origins_from_env() -> list[str]:
@@ -42,6 +46,27 @@ def create_app() -> FastAPI:
         )
 
     app.mount("/demo", StaticFiles(directory="web", html=True), name="demo")
+
+    @app.exception_handler(CountyNotFoundError)
+    async def county_not_found_handler(
+        request: Request, exc: CountyNotFoundError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(ScoringError)
+    async def scoring_error_handler(
+        request: Request, exc: ScoringError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        LOGGER.exception("Unexpected error: %s", exc)
+        return JSONResponse(
+            status_code=500, content={"detail": "An unexpected error occurred."}
+        )
 
     @app.get("/")
     def root() -> RedirectResponse:
@@ -77,6 +102,8 @@ def create_app() -> FastAPI:
             )
             return ScoreResponse(**payload)
         except ScoringServiceError as error:
+            if error.status_code == 404:
+                raise CountyNotFoundError(request.county_fips) from error
             raise HTTPException(status_code=error.status_code, detail=error.to_detail()) from error
 
     @app.post("/score/batch", response_model=list[ScoreResponse])
@@ -93,6 +120,8 @@ def create_app() -> FastAPI:
                 )
                 responses.append(ScoreResponse(**payload))
             except ScoringServiceError as error:
+                if error.status_code == 404:
+                    raise CountyNotFoundError(request.county_fips) from error
                 raise HTTPException(status_code=error.status_code, detail=error.to_detail()) from error
 
         return responses

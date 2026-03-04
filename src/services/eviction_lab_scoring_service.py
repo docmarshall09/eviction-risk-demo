@@ -441,10 +441,15 @@ class EvictionLabScoringService:
                 details={"as_of_year_available": False},
             )
 
-        year_scores = pd.Series(
-            model.predict_proba(year_df[MODEL_FEATURE_COLUMNS])[:, 1],
-            dtype="float64",
-        )
+        try:
+            year_scores = pd.Series(
+                model.predict_proba(year_df[MODEL_FEATURE_COLUMNS])[:, 1],
+                dtype="float64",
+            )
+        except (KeyError, ValueError, IndexError) as exc:
+            raise ScoringServiceError(
+                f"Model inference failed for as_of_year={as_of_year}.", 500
+            ) from exc
         self._cached_year_scores[as_of_year] = year_scores
         return year_scores
 
@@ -624,9 +629,14 @@ class EvictionLabScoringService:
                 },
             )
 
-        risk_score = float(
-            model.predict_proba(county_year_df[MODEL_FEATURE_COLUMNS])[:, 1][0]
-        )
+        try:
+            risk_score = float(
+                model.predict_proba(county_year_df[MODEL_FEATURE_COLUMNS])[:, 1][0]
+            )
+        except (KeyError, ValueError, IndexError) as exc:
+            raise ScoringServiceError(
+                f"Model inference failed for county '{normalized_fips}'.", 500
+            ) from exc
 
         year_scores = self._get_year_score_distribution(resolved_as_of_year)
         risk_percentile = float((year_scores <= risk_score).mean() * 100.0)
