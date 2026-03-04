@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -30,7 +30,7 @@ class ScoringServiceError(Exception):
         self,
         message: str,
         status_code: int,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the service error.
 
@@ -44,7 +44,7 @@ class ScoringServiceError(Exception):
         self.message = message
         self.details = details or {}
 
-    def to_detail(self) -> Dict[str, Any]:
+    def to_detail(self) -> dict[str, Any]:
         """Return structured detail payload for HTTP error responses."""
         payload = {"message": self.message}
         payload.update(self.details)
@@ -69,7 +69,7 @@ def _normalize_county_fips(county_fips: str) -> str:
     return digits_only.zfill(5)
 
 
-def _read_json_if_exists(path: Path) -> Optional[Dict[str, Any]]:
+def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
     """Read a JSON file from disk if present, else return None."""
     if not path.exists():
         return None
@@ -126,10 +126,10 @@ def _final_step_if_pipeline(estimator: Any) -> Any:
     return named_steps[last_step_name]
 
 
-def _extract_linear_model_params(model: Any) -> Dict[str, Any]:
+def _extract_linear_model_params(model: Any) -> dict[str, Any]:
     """Extract intercept/coefficients/feature order from the loaded model."""
-    intercept: Optional[float] = None
-    coefficients: Optional[Dict[str, float]] = None
+    intercept: float | None = None
+    coefficients: dict[str, float] | None = None
 
     feature_order: list[str] = []
     if hasattr(model, "feature_names_in_"):
@@ -174,7 +174,7 @@ def _extract_linear_model_params(model: Any) -> Dict[str, Any]:
     }
 
 
-def _extract_calibration_params(model: Any) -> Optional[Dict[str, Any]]:
+def _extract_calibration_params(model: Any) -> dict[str, Any] | None:
     """Extract calibration details from calibrated models when present."""
     calibrated_estimators = getattr(model, "calibrated_classifiers_", [])
     if not calibrated_estimators:
@@ -184,7 +184,7 @@ def _extract_calibration_params(model: Any) -> Optional[Dict[str, Any]]:
     calibration_method = str(
         getattr(model, "calibration_method", getattr(first_calibrated, "method", "unknown"))
     )
-    payload: Dict[str, Any] = {"method": calibration_method}
+    payload: dict[str, Any] = {"method": calibration_method}
 
     calibration_time_values = getattr(model, "calibration_time_values", None)
     if calibration_time_values is not None:
@@ -218,7 +218,7 @@ def _extract_calibration_params(model: Any) -> Optional[Dict[str, Any]]:
     return payload
 
 
-def _extract_scaler_params(model: Any) -> Optional[Dict[str, Any]]:
+def _extract_scaler_params(model: Any) -> dict[str, Any] | None:
     """Extract scaler parameters when a scaler is present in the model stack."""
     for candidate in _candidate_estimators(model):
         pipeline_steps = getattr(candidate, "named_steps", None)
@@ -275,10 +275,10 @@ class EvictionLabScoringService:
         self._metadata_path = metadata_path
         self._metrics_path = metrics_path
 
-        self._cached_model: Optional[Any] = None
-        self._cached_feature_df: Optional[pd.DataFrame] = None
-        self._cached_metadata: Optional[Dict[str, Any]] = None
-        self._cached_year_scores: Dict[int, pd.Series] = {}
+        self._cached_model: Any | None = None
+        self._cached_feature_df: pd.DataFrame | None = None
+        self._cached_metadata: dict[str, Any] | None = None
+        self._cached_year_scores: dict[int, pd.Series] = {}
 
     def _load_model(self) -> Any:
         """Load and cache model artifact on first use."""
@@ -330,7 +330,7 @@ class EvictionLabScoringService:
         self._cached_feature_df = feature_df
         return feature_df
 
-    def _read_metrics_summary(self) -> Optional[Dict[str, Any]]:
+    def _read_metrics_summary(self) -> dict[str, Any] | None:
         """Read a compact metrics summary from the latest metrics report."""
         metrics_payload = _read_json_if_exists(self._metrics_path)
         if metrics_payload is None:
@@ -345,7 +345,7 @@ class EvictionLabScoringService:
             "test_year_end",
         ]
 
-        summary: Dict[str, Any] = {}
+        summary: dict[str, Any] = {}
         for key in summary_keys:
             if key in metrics_payload:
                 summary[key] = metrics_payload[key]
@@ -355,7 +355,7 @@ class EvictionLabScoringService:
 
         return summary or None
 
-    def _build_fallback_metadata(self) -> Dict[str, Any]:
+    def _build_fallback_metadata(self) -> dict[str, Any]:
         """Build metadata fallback when metadata artifact is missing."""
         feature_df = self._load_feature_table()
         available_years = sorted(feature_df["year"].unique().tolist())
@@ -377,7 +377,7 @@ class EvictionLabScoringService:
             "limitations": DEFAULT_LIMITATIONS,
         }
 
-    def _load_metadata(self) -> Dict[str, Any]:
+    def _load_metadata(self) -> dict[str, Any]:
         """Load and cache model metadata artifact for API responses."""
         if self._cached_metadata is not None:
             return self._cached_metadata
@@ -453,7 +453,7 @@ class EvictionLabScoringService:
         self._cached_year_scores[as_of_year] = year_scores
         return year_scores
 
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self) -> dict[str, Any]:
         """Return metadata for API About/docs usage."""
         metadata = self._load_metadata().copy()
         model = self._load_model()
@@ -531,7 +531,7 @@ class EvictionLabScoringService:
     def _get_available_year_bounds(
         self,
         county_scoreable_df: pd.DataFrame,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Get min and max available scoreable years for one county."""
         min_year = int(county_scoreable_df["year"].min())
         max_year = int(county_scoreable_df["year"].max())
@@ -540,9 +540,9 @@ class EvictionLabScoringService:
     def _resolve_as_of_year(
         self,
         county_fips: str,
-        requested_as_of_year: Optional[int],
+        requested_as_of_year: int | None,
         available_years: list[int],
-    ) -> Tuple[int, Optional[str]]:
+    ) -> tuple[int, str | None]:
         """Resolve the feature year to use for scoring.
 
         Args:
@@ -586,8 +586,8 @@ class EvictionLabScoringService:
     def score_county(
         self,
         county_fips: str,
-        as_of_year: Optional[int],
-    ) -> Dict[str, Any]:
+        as_of_year: int | None,
+    ) -> dict[str, Any]:
         """Score one county-year request using model and processed feature table.
 
         Args:
@@ -666,7 +666,7 @@ class EvictionLabScoringService:
         }
 
 
-_SERVICE_INSTANCE: Optional[EvictionLabScoringService] = None
+_SERVICE_INSTANCE: EvictionLabScoringService | None = None
 
 
 def get_scoring_service() -> EvictionLabScoringService:

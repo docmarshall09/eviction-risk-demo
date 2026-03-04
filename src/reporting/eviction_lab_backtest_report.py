@@ -3,7 +3,7 @@
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pandas as pd
 from sklearn.metrics import roc_auc_score
@@ -17,7 +17,7 @@ from src.config import (
 )
 
 
-def _read_json(path: Path) -> Dict[str, Any]:
+def _read_json(path: Path) -> dict[str, Any]:
     """Read a JSON file from disk."""
     with path.open("r", encoding="utf-8") as json_file:
         return json.load(json_file)
@@ -54,7 +54,7 @@ def _normalize_feature_df(feature_df: pd.DataFrame) -> pd.DataFrame:
     return normalized_df
 
 
-def _safe_auc(y_true: pd.Series, score: pd.Series) -> Optional[float]:
+def _safe_auc(y_true: pd.Series, score: pd.Series) -> float | None:
     """Compute AUC only when both classes are present."""
     if y_true.nunique() < 2:
         return None
@@ -107,7 +107,7 @@ def _build_year_summary_rows(
     return summary_df
 
 
-def _build_pooled_summary(detail_df: pd.DataFrame, prediction_column: str) -> Dict[str, Any]:
+def _build_pooled_summary(detail_df: pd.DataFrame, prediction_column: str) -> dict[str, Any]:
     """Build pooled summary metrics across all outcome years in a holdout."""
     y_true = detail_df["y"]
     y_pred = detail_df[prediction_column]
@@ -157,7 +157,7 @@ def _format_pct(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
-def _format_auc(value: Optional[float]) -> str:
+def _format_auc(value: float | None) -> str:
     """Format optional AUC value for markdown output."""
     if value is None:
         return "N/A"
@@ -219,10 +219,10 @@ def _score_distribution_rows(detail_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _build_executive_summary(
-    model_2018: Dict[str, Any],
-    model_last_two: Dict[str, Any],
-    naive_2018: Dict[str, Any],
-    naive_last_two: Dict[str, Any],
+    model_2018: dict[str, Any],
+    model_last_two: dict[str, Any],
+    naive_2018: dict[str, Any],
+    naive_last_two: dict[str, Any],
 ) -> list[str]:
     """Build concise executive-summary bullets."""
     random_precision = 0.25
@@ -254,9 +254,9 @@ def _build_executive_summary(
 
 
 def generate_backtest_summary_markdown(
-    last_year_json: Dict[str, Any],
+    last_year_json: dict[str, Any],
     last_year_detail: pd.DataFrame,
-    last_two_json: Dict[str, Any],
+    last_two_json: dict[str, Any],
     last_two_detail: pd.DataFrame,
     feature_df: pd.DataFrame,
 ) -> str:

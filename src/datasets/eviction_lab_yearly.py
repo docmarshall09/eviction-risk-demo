@@ -2,8 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
-
 import pandas as pd
 
 
@@ -26,7 +24,7 @@ def _normalize_column_name(column_name: str) -> str:
     return "".join(character for character in column_name.lower() if character.isalnum())
 
 
-def _normalize_fips(value: object) -> Optional[str]:
+def _normalize_fips(value: object) -> str | None:
     """Convert county FIPS values to zero-padded 5-character strings."""
     if pd.isna(value):
         return None

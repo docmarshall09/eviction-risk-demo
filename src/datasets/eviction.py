@@ -2,8 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, Optional
-
 import pandas as pd
 
 
@@ -21,7 +19,7 @@ def _normalize_column_name(column_name: str) -> str:
     return "".join(character for character in column_name.lower() if character.isalnum())
 
 
-def _build_column_map(columns: pd.Index) -> Dict[str, str]:
+def _build_column_map(columns: pd.Index) -> dict[str, str]:
     """Map raw input columns to canonical required names."""
     normalized_to_original = {
         _normalize_column_name(str(column)): str(column) for column in columns
@@ -32,7 +30,7 @@ def _build_column_map(columns: pd.Index) -> Dict[str, str]:
         for canonical_name, column_name in REQUIRED_COLUMNS.items()
     }
 
-    column_map: Dict[str, str] = {}
+    column_map: dict[str, str] = {}
     for normalized_required, canonical_name in required_lookup.items():
         if normalized_required in normalized_to_original:
             column_map[normalized_to_original[normalized_required]] = canonical_name
@@ -40,7 +38,7 @@ def _build_column_map(columns: pd.Index) -> Dict[str, str]:
     return column_map
 
 
-def _normalize_fips(value: object) -> Optional[str]:
+def _normalize_fips(value: object) -> str | None:
     """Normalize a county FIPS value to a zero-padded 5-digit string."""
     if pd.isna(value):
         return None

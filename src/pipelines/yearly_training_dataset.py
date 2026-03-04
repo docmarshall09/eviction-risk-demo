@@ -5,8 +5,6 @@ logistic-regression training dataframe so training code and audit exports
 stay in sync.
 """
 
-from typing import Tuple
-
 import pandas as pd
 
 from src.models.eviction_lab_yearly_model import MODEL_FEATURE_COLUMNS
@@ -64,7 +62,7 @@ def build_yearly_training_dataset(feature_df: pd.DataFrame) -> pd.DataFrame:
 
 def build_yearly_training_dataset_with_audit(
     feature_df: pd.DataFrame,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Build yearly training rows and return row-level and step-level audits.
 
     Args:

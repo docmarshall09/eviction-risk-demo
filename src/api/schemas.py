@@ -1,6 +1,6 @@
 """Pydantic request/response schemas for the eviction-risk API."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -27,7 +27,7 @@ class ScoreRequest(BaseModel):
     """Request schema for county-level risk scoring."""
 
     county_fips: str = Field(..., description="County FIPS code.")
-    as_of_year: Optional[int] = Field(
+    as_of_year: int | None = Field(
         default=None,
         ge=2000,
         le=2100,
@@ -59,29 +59,29 @@ class ScoreResponse(BaseModel):
     risk_score: float = Field(..., ge=0.0, le=1.0, description="Predicted risk score.")
     model_version: str = Field(..., description="Trained model version identifier.")
     model_type: str = Field(..., description="Model type identifier.")
-    as_of_year_available: Optional[bool] = Field(
+    as_of_year_available: bool | None = Field(
         None,
         description="Whether requested as_of_year exists for this county in the feature table.",
     )
-    available_years_min: Optional[int] = Field(
+    available_years_min: int | None = Field(
         None,
         description="Minimum available feature year for this county, when known.",
     )
-    available_years_max: Optional[int] = Field(
+    available_years_max: int | None = Field(
         None,
         description="Maximum available feature year for this county, when known.",
     )
-    risk_percentile_in_year: Optional[float] = Field(
+    risk_percentile_in_year: float | None = Field(
         None,
         ge=0.0,
         le=100.0,
         description="Percentile rank of risk_score among scoreable counties in that year.",
     )
-    features_used: Optional[Dict[str, float]] = Field(
+    features_used: dict[str, float] | None = Field(
         None,
         description="Model feature values used for this county-year score.",
     )
-    notes: Optional[str] = Field(None, description="Optional scoring note.")
+    notes: str | None = Field(None, description="Optional scoring note.")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -121,15 +121,15 @@ class MetadataResponse(BaseModel):
     trained_on_dataset_name: str
     training_years: TrainingYears
     label_definition: str
-    feature_list: List[str]
-    metrics_summary: Optional[Dict[str, Any]]
-    limitations: List[str]
-    intercept: Optional[float] = None
-    coefficients: Optional[Dict[str, float]] = None
-    feature_order: Optional[List[str]] = None
-    calibration_params: Optional[Dict[str, Any]] = None
-    scaler_params: Optional[Dict[str, Any]] = None
-    provenance: Optional[Dict[str, Any]] = None
+    feature_list: list[str]
+    metrics_summary: dict[str, Any] | None
+    limitations: list[str]
+    intercept: float | None = None
+    coefficients: dict[str, float] | None = None
+    feature_order: list[str] | None = None
+    calibration_params: dict[str, Any] | None = None
+    scaler_params: dict[str, Any] | None = None
+    provenance: dict[str, Any] | None = None
 
     model_config = ConfigDict(
         json_schema_extra={
