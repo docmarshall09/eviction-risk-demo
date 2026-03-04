@@ -44,6 +44,11 @@ COPY --from=builder /app/models/eviction_lab_yearly_model.joblib /app/models/evi
 COPY --from=builder /app/models/eviction_lab_yearly_model_metadata.json /app/models/eviction_lab_yearly_model_metadata.json
 COPY --from=builder /app/data/processed/eviction_lab_yearly_features.csv /app/data/processed/eviction_lab_yearly_features.csv
 
+RUN groupadd --system appuser \
+    && useradd --system --gid appuser appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8000
 
 CMD ["sh", "-c", "uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
